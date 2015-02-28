@@ -13,9 +13,9 @@ public class BufMgr {
 	* Allocate pages (frames) for the buffer pool in main memory and
 	* make the buffer manager aware that the replacement policy is specified by replacerArg (e.g., LH, Clock, LRU, MRU, LIRS, etc.).
 	*
-	* @param​numbufs number of buffers in the buffer pool
-	* @param​lookAheadSize number of pages to be looked ahead
-	* @param​replacementPolicy Name of the replacement policy
+	* @param numbufs number of buffers in the buffer pool
+	* @param lookAheadSize number of pages to be looked ahead
+	* @param replacementPolicy Name of the replacement policy
 	*/
 	public BufMgr(int numbufs, int lookAheadSize, String replacementPolicy) {
 		bufPool = new Page[numbufs];
@@ -37,7 +37,7 @@ public class BufMgr {
 	*
 	* @param pageno page number in the Minibase.
 	* @param page the pointer point to the page.
-	* @param emptyPage true (empty page); false (non­empty page)
+	* @param emptyPage true (empty page); false (non-empty page)
 	*/
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) {}
 	

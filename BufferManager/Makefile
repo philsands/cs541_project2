@@ -1,21 +1,22 @@
-JDKPATH = C:/Program Files/Java/jdk1.7.0_45
+JDKPATH = /usr
 LIBPATH = lib/bufmgrAssign.jar
 
-CLASSPATH = $(LIBPATH)
-BINPATH = $(JDKPATH)/bin
+CLASSPATH = .:..:$(LIBPATH)
+BINPATH = bin
 JAVAC = $(JDKPATH)/bin/javac 
 JAVA  = $(JDKPATH)/bin/java 
 
-PROGS = xx
+PROGS = bufmgr diskmgr tests
 
 all: $(PROGS)
 
-compile:src/*/*.java
-	$(JAVAC) -cp $(CLASSPATH) -d bin src/bufmgr/*.java
-	$(JAVAC) -cp $(CLASSPATH) -d bin src/diskmgr/*.java
-	$(JAVAC) -cp $(CLASSPATH) -d bin src/tests/*.java
-	
+bufmgr:
+	$(JAVAC) -cp $(CLASSPATH) src/bufmgr/*.java
+diskmgr:
+	$(JAVAC) -cp $(CLASSPATH):bin src/diskmgr/*.java
+tests:
+	$(JAVAC) -cp $(CLASSPATH):bin src/tests/*.java
 
-xx : compile
+bmtest: 
 	$(JAVA) -cp $(CLASSPATH):bin tests.BMTest
 
