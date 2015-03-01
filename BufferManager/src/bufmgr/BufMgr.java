@@ -74,6 +74,7 @@ public class BufMgr {
 			}catch(Exception e){
 				System.out.print("Read Exception");
 			}
+			bufPool[newframeID]=page;
 			Descriptor des=new Descriptor(pageno,0,false);
 			bufDescr[newframeID]=des;
 			pageFrameDirectory.remove(pageno.pid);
@@ -102,7 +103,23 @@ public class BufMgr {
 	* @param pageno page number in the Minibase.
 	* @param dirty the dirty bit of the frame
 	*/
-	public void unpinPage(PageId pageno, boolean dirty) {}
+	public void unpinPage(PageId pageno, boolean dirty) {
+		if(dirty!=true) return;
+		if(pageFrameDirectory.hasPage(pageno.pid)){
+			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
+			int pintemp=bufDescr[pagepair.getFrameNum()].pinCount;
+			if(pintemp==0){//throw exception;
+				
+			}else if(pintemp>0){
+				bufDescr[pagepair.getFrameNum()].pinCount--;
+				bufDescr[pagepair.getFrameNum()].dirtyBit=false;
+				
+			}
+		}
+		else{
+			//throw exception
+		}
+	}
 	
 	/**
 	* Allocate new pages.* Call DB object to allocate a run of new pages and
@@ -117,7 +134,43 @@ public class BufMgr {
 	*
 	* @return the first page id of the new pages.__ null, if error.
 	*/
-	public PageId newPage(Page firstpage, int howmany) {return new PageId();}
+	public PageId newPage(Page firstpage, int howmany) {
+		//find the new frame for new page
+		int newframe=-1;
+		for(int i=0;i<numbufs;i++){
+			if(bufPool[i]!=null){
+				newframe=i;
+				break;
+			}
+		}
+		if(newframe==-1){//buffer is full, flush and search again;
+			flushAllPages();
+			for(int i=0;i<numbufs;i++){
+				if(bufPool[i]!=null){
+					newframe=i;
+					break;
+				}
+			}
+		}
+		PageId pgid=null;
+		if(newframe==1){
+			System.out.println("no more buffer");
+			return null;
+		}else{
+			try{
+			pgid=disk.allocate_page(howmany);
+			}catch(Exception e){
+				System.out.print("Allocate error");
+			}
+			try{
+				disk.read_page(pgid,firstpage);
+				}catch(Exception e){
+					System.out.print("Read_Page error");
+				}
+			return pgid;
+		}
+		
+	}
 	
 	/**
 	* This method should be called to delete a page that is on disk.
