@@ -178,12 +178,15 @@ public class BufMgr {
 	* @param globalPageId the page number in the data base.
 	*/
 	public void freePage(PageId globalPageId) {
+		PageFramePair pagepair= pageFrameDirectory.search(globalPageId.pid);
 		try{
 			disk.deallocate_page(globalPageId);
 		}catch(Exception e){
 			System.out.println("FreePage Exception");
 		}
-		//there we should clear bufDescr and bufPool?????
+		pageFrameDirectory.remove(pagepair.getPageNum());
+		bufDescr[pagepair.getFrameNum()] = null;
+		bufPool[pagepair.getFrameNum()] = null;
 	}
 	
 	/**
@@ -203,6 +206,7 @@ public class BufMgr {
 				System.out.println("Flush Page Error");
 			}
 		}
+		pageFrameDirectory.remove(pagepair.getPageNum());
 		bufDescr[pagepair.getFrameNum()] = null;
 		bufPool[pagepair.getFrameNum()] = null;
 	}
