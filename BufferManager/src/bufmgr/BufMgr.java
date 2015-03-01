@@ -51,6 +51,7 @@ public class BufMgr {
 	*/
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
 		// search buffer pool for existence of page using hash
+		HashTable hs= new HashTable
 		// if found, increment pin count for page and return pointer to page
 		// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
 		// if dirty, write out before flushing from buffer
@@ -177,6 +178,19 @@ class HashTable {
 				break;
 			}
 		}
+	}
+	
+	public boolean hasPage(int pn){//hasPage with hashFunction
+		int bn = hashFunction(pn);
+		for (int i = 0; i < directory[bn].size(); i++)
+		{
+			if ((directory[bn].get(i)).getPageNum() == pn) 
+			{
+				return true;
+			}
+		}
+		
+		return false;
 	}
 	
 	public boolean hasPage(int bn, int pn)
