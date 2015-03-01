@@ -60,7 +60,7 @@ public class BufMgr {
 			
 			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
 			if(pagepair!=null){
-				int pintemp=bufDescr[pagepair.getFrameNum()].pinCount++;
+				int pintemp=bufDescr[pagepair.getFrameNum()].incrementPinCount();
 				page=bufPool[pagepair.getFrameNum()];
 				return;
 			}
@@ -68,7 +68,7 @@ public class BufMgr {
 		else{
 			// the newframeID here is not right, should use LIRS
 			int newframeID=pageFrameDirectory.hashFunction(pageno.pid);
-			if(bufDescr[newframeID].dirtyBit) flushPage(pageno);
+			if(bufDescr[newframeID].getDirtyBit()) flushPage(pageno);
 			try{
 			disk.read_page(pageno,page);
 			}catch(Exception e){
@@ -107,12 +107,12 @@ public class BufMgr {
 		if(dirty!=true) return;
 		if(pageFrameDirectory.hasPage(pageno.pid)){
 			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
-			int pintemp=bufDescr[pagepair.getFrameNum()].pinCount;
+			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
 			if(pintemp==0){//throw exception;
 				
 			}else if(pintemp>0){
-				bufDescr[pagepair.getFrameNum()].pinCount--;
-				bufDescr[pagepair.getFrameNum()].dirtyBit=false;
+				bufDescr[pagepair.getFrameNum()].decrementPinCount();
+				bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
 				
 			}
 		}
@@ -187,7 +187,16 @@ public class BufMgr {
 	*
 	* @param pageid the page number in the database.
 	*/
-	public void flushPage(PageId pageid) {}
+	public void flushPage(PageId pageid) 
+	{
+		// look up page in directory
+		//int pageNum = bufDescr[pageid];
+		//pageFrameDirectory.
+		// check to see if write is needed
+		// write page to disk
+		// free page in buffer pool
+		// remove page from directory
+	}
 	
 	/**
 	* Used to flush all dirty pages in the buffer pool to disk
@@ -207,7 +216,7 @@ public class BufMgr {
 		int unpinned = 0;
 		for (Descriptor d : bufDescr)
 		{
-			if (d.pinCount == 0)
+			if (d.getPinCount() == 0)
 				unpinned++;
 		}
 		
@@ -217,15 +226,39 @@ public class BufMgr {
 };
 
 class Descriptor {
-	public PageId pageNumber;
-	public int pinCount;
-	public boolean dirtyBit;
+	private PageId pageNumber;
+	private int pinCount;
+	private boolean dirtyBit;
 	
 	public Descriptor(PageId pn, int pc, boolean db) {
 		pageNumber = pn;
 		pinCount = pc;
 		dirtyBit = db;
-	};
+	}
+	
+	// getters
+	public PageId getPageNumber() {return pageNumber;}
+	public int getPinCount() {return pinCount;}
+	public boolean getDirtyBit() {return dirtyBit;}
+	
+	// setters
+	public int incrementPinCount()
+	{
+		pinCount++;
+		return pinCount;
+	}
+	public int decrementPinCount()
+	{
+		if (pinCount > 0)
+			pinCount--;
+		return pinCount;
+	}
+	public boolean setDirtyBit(boolean dbv)
+	{
+		dirtyBit = dbv;
+		return dirtyBit;
+	}
+	
 }
 
 class HashTable {
