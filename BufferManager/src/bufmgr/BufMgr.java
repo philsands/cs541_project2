@@ -1,8 +1,8 @@
 package bufmgr;
 
+import diskmgr.*;
 import global.PageId;
 import global.Page;
-
 import java.util.LinkedList;
 import java.util.List;
 
@@ -13,6 +13,7 @@ public class BufMgr {
 	private HashTable pageFrameDirectory;
 	private String replacementPolicy;
 	private int numbufs;
+	private DiskMgr disk;
 	
 	/**
 	* Create the BufMgr object.
@@ -26,6 +27,7 @@ public class BufMgr {
 	public BufMgr(int numbufs, int lookAheadSize, String replacementPolicy) {
 		// initialize all buffer pool components
 		bufPool = new Page[numbufs];
+		disk=new DiskMgr();
 		bufDescr = new Descriptor[numbufs];
 		pageFrameDirectory = new HashTable(13);	// 13 is arbitrarily chosen prime number for now
 		this.numbufs = numbufs;
@@ -64,6 +66,18 @@ public class BufMgr {
 			}
 		}
 		else{
+			// the newframeID here is not right, should use LIRS
+			int newframeID=pageFrameDirectory.hashFunction(pageno.pid);
+			if(bufDescr[newframeID].dirtyBit) flushPage(pageno);
+			try{
+			disk.read_page(pageno,page);
+			}catch(Exception e){
+				System.out.print("Read Exception");
+			}
+			Descriptor des=new Descriptor(pageno,0,false);
+			bufDescr[newframeID]=des;
+			pageFrameDirectory.remove(pageno.pid);
+			pageFrameDirectory.insert(pageno.pid,newframeID);
 			
 		}
 
@@ -164,7 +178,7 @@ class HashTable {
 		tableSize = ts;
 	}
 	
-	private int hashFunction(int key) {
+	public int hashFunction(int key) {
 		return (A*key + B) % tableSize;
 	}
 	
