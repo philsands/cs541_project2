@@ -53,6 +53,19 @@ public class BufMgr {
 	*/
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
 		// search buffer pool for existence of page using hash
+		if(emptyPage==true) return;
+		if(pageFrameDirectory.hasPage(pageno.pid)){
+			
+			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
+			if(pagepair!=null){
+				int pintemp=bufDescr[pagepair.getFrameNum()].pinCount++;
+				page=bufPool[pagepair.getFrameNum()];
+				return;
+			}
+		}
+		else{
+			
+		}
 
 		// if found, increment pin count for page and return pointer to page
 		// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
@@ -128,9 +141,9 @@ public class BufMgr {
 };
 
 class Descriptor {
-	private PageId pageNumber;
-	private int pinCount;
-	private boolean dirtyBit;
+	public PageId pageNumber;
+	public int pinCount;
+	public boolean dirtyBit;
 	
 	public Descriptor(PageId pn, int pc, boolean db) {
 		pageNumber = pn;
@@ -166,6 +179,19 @@ class HashTable {
 		}
 		
 		return false;
+	}
+	
+	public PageFramePair search(int pn)
+	{
+		int bn = hashFunction(pn);
+		for (int i = 0; i < directory[bn].size(); i++)
+			{
+				if ((directory[bn].get(i)).getPageNum() == pn) 
+				{
+					return directory[bn].get(i);
+				}
+			}
+		return null;
 	}
 	
 	public void remove(int pn)
