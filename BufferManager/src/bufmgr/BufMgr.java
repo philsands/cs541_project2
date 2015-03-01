@@ -143,20 +143,20 @@ public class BufMgr {
 				break;
 			}
 		}
-		if(newframe==-1){//buffer is full, flush and search again;
-			flushAllPages();
+		if(newframe==-1){//buffer is full, deallocate
+			
 			for(int i=0;i<numbufs;i++){
-				if(bufPool[i]!=null){
-					newframe=i;
-					break;
+				try{
+				disk.deallocate_page(bufDescr[i].pageNumber);
+				}catch(Exception e){
+					System.out.println("Deallocate error");
 				}
 			}
-		}
-		PageId pgid=null;
-		if(newframe==-1){
-			System.out.println("no more buffer");
 			return null;
-		}else{
+		}
+		else{
+			PageId pgid=null;
+		
 			try{
 			pgid=disk.allocate_page(howmany);
 			}catch(Exception e){
@@ -179,7 +179,13 @@ public class BufMgr {
 	*
 	* @param globalPageId the page number in the data base.
 	*/
-	public void freePage(PageId globalPageId) {}
+	public void freePage(PageId globalPageId) {
+		try{
+		disk.deallocate_page(globalPageId);
+		}catch(Exception e){
+			System.out.println("FreePage Exception");
+		}
+	}
 	
 	/**
 	* Used to flush a particular page of the buffer pool to disk.
