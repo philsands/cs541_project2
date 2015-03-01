@@ -146,11 +146,9 @@ public class BufMgr {
 		if(newframe==-1){//buffer is full, deallocate
 			
 			for(int i=0;i<numbufs;i++){
-				try{
-				disk.deallocate_page(bufDescr[i].pageNumber);
-				}catch(Exception e){
-					System.out.println("Deallocate error");
-				}
+				
+				freePage(bufDescr[i].pageNumber);
+				
 			}
 			return null;
 		}
@@ -185,6 +183,7 @@ public class BufMgr {
 		}catch(Exception e){
 			System.out.println("FreePage Exception");
 		}
+		//there we should clear bufDescr and bufPool?????
 	}
 	
 	/**
@@ -194,14 +193,25 @@ public class BufMgr {
 	* @param pageid the page number in the database.
 	*/
 	public void flushPage(PageId pageid) {
-		
+		PageFramePair pagepair= pageFrameDirectory.search(pageid.pid);
+		try{
+			disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
+		}catch(Exception e){
+			System.out.println("Flush Page Error");
+		}
+		//there we should clear bufDescr and bufPool?????
 	}
 	
 	/**
 	* Used to flush all dirty pages in the buffer pool to disk
 	*
 	*/
-	public void flushAllPages() {}
+	public void flushAllPages() {
+		for(int i=0;i<numbufs;i++){
+			if(bufDescr[i].dirtyBit==true)
+			flushPage(bufDescr[i].pageNumber);
+		}
+	}
 	
 	/**
 	* Returns the total number of buffer frames.
