@@ -145,12 +145,21 @@ public class BufMgr {
 	/**
 	* Returns the total number of buffer frames.
 	*/
-	public int getNumBuffers() {return 0;}
+	public int getNumBuffers() {return numbufs;}
 	
 	/**
 	* Returns the total number of unpinned buffer frames.
 	*/
-	public int getNumUnpinned() {return 0;}
+	public int getNumUnpinned() {
+		int unpinned = 0;
+		for (Descriptor d : bufDescr)
+		{
+			if (d.pinCount == 0)
+				unpinned++;
+		}
+		
+		return unpinned;
+	}
 
 };
 
