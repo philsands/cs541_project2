@@ -179,7 +179,7 @@ public class BufMgr {
 	*/
 	public void freePage(PageId globalPageId) {
 		try{
-		disk.deallocate_page(globalPageId);
+			disk.deallocate_page(globalPageId);
 		}catch(Exception e){
 			System.out.println("FreePage Exception");
 		}
@@ -195,12 +195,16 @@ public class BufMgr {
 
 	public void flushPage(PageId pageid) {
 		PageFramePair pagepair= pageFrameDirectory.search(pageid.pid);
-		try{
-			disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
-		}catch(Exception e){
-			System.out.println("Flush Page Error");
+		if (bufDescr[pagepair.getFrameNum()].getDirtyBit())
+		{
+			try{
+				disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
+			}catch(Exception e){
+				System.out.println("Flush Page Error");
+			}
 		}
-		//there we should clear bufDescr and bufPool?????
+		bufDescr[pagepair.getFrameNum()] = null;
+		bufPool[pagepair.getFrameNum()] = null;
 	}
 	
 	/**
@@ -210,7 +214,7 @@ public class BufMgr {
 	public void flushAllPages() {
 		for(int i=0;i<numbufs;i++){
 			if(bufDescr[i].getDirtyBit()==true)
-			flushPage(bufDescr[i].getPageNumber());
+				flushPage(bufDescr[i].getPageNumber());
 		}
 	}
 	
