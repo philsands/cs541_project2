@@ -137,7 +137,7 @@ class Descriptor {
 }
 
 class HashTable {
-	private LinkedList<BufferPage> directory[];
+	private LinkedList<PageFramePair> directory[];
 	private int tableSize;
 	public static final int A = 42;		// these numbers have no real significance and were chosen for a consistent hash
 	public static final int B = 13298;
@@ -158,7 +158,7 @@ class HashTable {
 		
 		if (!hasPage(bucketNumber, pn))
 		{
-			directory[bucketNumber].addLast(new BufferPage(pn,fn));
+			directory[bucketNumber].addLast(new PageFramePair(pn,fn));
 			return true;
 		}
 		
@@ -193,11 +193,11 @@ class HashTable {
 	}
 }
 
-class BufferPage {
+class PageFramePair {
 	private int pageNum;
 	private int frameNum;
 	
-	public BufferPage(int pn, int fn)
+	public PageFramePair(int pn, int fn)
 	{
 		pageNum = pn;
 		frameNum = fn;
