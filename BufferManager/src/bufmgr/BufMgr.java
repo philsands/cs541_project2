@@ -56,8 +56,6 @@ public class BufMgr {
 		// if dirty, write out before flushing from buffer
 	}
 	
-	private 
-	
 	/**
 	* Unpin a page specified by a pageId.
 	* This method should be called with dirty==true if the client has
@@ -139,28 +137,67 @@ class Descriptor {
 }
 
 class HashTable {
-	private LinkedList<Bucket> directory[];
+	private LinkedList<BufferPage> directory[];
 	private int tableSize;
-	public static final int A = 42;
+	public static final int A = 42;		// these numbers have no real significance and were chosen for a consistent hash
 	public static final int B = 13298;
-	
 	
 	public HashTable(int ts)
 	{
 		directory = new LinkedList[ts];
-		this.tableSize = ts;
+		tableSize = ts;
 	}
 	
-	public int hashFunction(int key) {
+	private int hashFunction(int key) {
 		return (A*key + B) % tableSize;
+	}
+	
+	public boolean insert(int pn, int fn)
+	{
+		int bucketNumber = hashFunction(pn);
+		
+		if (!hasPage(bucketNumber, pn))
+		{
+			directory[bucketNumber].addLast(new BufferPage(pn,fn));
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public void remove(int pn)
+	{
+		int bucketNumber = hashFunction(pn);
+		
+		for (int i = 0; i < directory[bucketNumber].size(); i++)
+		{
+			if ((directory[bucketNumber].get(i)).getPageNum() == pn) 
+			{
+				directory[bucketNumber].remove(i);
+				break;
+			}
+		}
+	}
+	
+	public boolean hasPage(int bn, int pn)
+	{
+		for (int i = 0; i < directory[bn].size(); i++)
+		{
+			if ((directory[bn].get(i)).getPageNum() == pn) 
+			{
+				return true;
+			}
+		}
+		
+		return false;
 	}
 }
 
-class Bucket {
+class BufferPage {
 	private int pageNum;
 	private int frameNum;
 	
-	public Bucket(int pn, int fn)
+	public BufferPage(int pn, int fn)
 	{
 		pageNum = pn;
 		frameNum = fn;
@@ -170,4 +207,3 @@ class Bucket {
 	public int getFrameNum() {return frameNum;}
 }
 
-}
