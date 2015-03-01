@@ -3,10 +3,15 @@ package bufmgr;
 import global.PageId;
 import global.Page;
 
+import java.util.LinkedList;
+import java.util.List;
+
 public class BufMgr {
 	
 	private Page bufPool[];			// array to manage buffer pool
 	private Descriptor bufDescr[];	// array of information regarding what is in the buffer pool
+	private String replacementPolicy;
+	private int numbufs;
 	
 	/**
 	* Create the BufMgr object.
@@ -18,7 +23,12 @@ public class BufMgr {
 	* @param replacementPolicy Name of the replacement policy
 	*/
 	public BufMgr(int numbufs, int lookAheadSize, String replacementPolicy) {
+		// initialize all buffer pool components
 		bufPool = new Page[numbufs];
+		bufDescr = new Descriptor[numbufs];
+		this.numbufs = numbufs;
+		// ignore lookAheadSize
+		this.replacementPolicy = replacementPolicy;
 	}
 	
 	/**
@@ -39,7 +49,14 @@ public class BufMgr {
 	* @param page the pointer point to the page.
 	* @param emptyPage true (empty page); false (non-empty page)
 	*/
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) {}
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
+		// search buffer pool for existence of page using hash
+		// if found, increment pin count for page and return pointer to page
+		// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
+		// if dirty, write out before flushing from buffer
+	}
+	
+	private 
 	
 	/**
 	* Unpin a page specified by a pageId.
@@ -119,4 +136,38 @@ class Descriptor {
 		pinCount = pc;
 		dirtyBit = db;
 	};
+}
+
+class HashTable {
+	private LinkedList<Bucket> directory[];
+	private int tableSize;
+	public static final int A = 42;
+	public static final int B = 13298;
+	
+	
+	public HashTable(int ts)
+	{
+		directory = new LinkedList[ts];
+		this.tableSize = ts;
+	}
+	
+	public int hashFunction(int key) {
+		return (A*key + B) % tableSize;
+	}
+}
+
+class Bucket {
+	private int pageNum;
+	private int frameNum;
+	
+	public Bucket(int pn, int fn)
+	{
+		pageNum = pn;
+		frameNum = fn;
+	}
+	
+	public int getPageNum() {return pageNum;}
+	public int getFrameNum() {return frameNum;}
+}
+
 }
