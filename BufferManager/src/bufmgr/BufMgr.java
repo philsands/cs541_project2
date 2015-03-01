@@ -153,7 +153,7 @@ public class BufMgr {
 			}
 		}
 		PageId pgid=null;
-		if(newframe==1){
+		if(newframe==-1){
 			System.out.println("no more buffer");
 			return null;
 		}else{
