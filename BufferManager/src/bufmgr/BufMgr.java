@@ -10,6 +10,7 @@ public class BufMgr {
 	
 	private Page bufPool[];			// array to manage buffer pool
 	private Descriptor bufDescr[];	// array of information regarding what is in the buffer pool
+	private HashTable pageFrameDirectory;
 	private String replacementPolicy;
 	private int numbufs;
 	
@@ -26,6 +27,7 @@ public class BufMgr {
 		// initialize all buffer pool components
 		bufPool = new Page[numbufs];
 		bufDescr = new Descriptor[numbufs];
+		pageFrameDirectory = new HashTable(13);	// 13 is arbitrarily chosen prime number for now
 		this.numbufs = numbufs;
 		// ignore lookAheadSize
 		this.replacementPolicy = replacementPolicy;
@@ -51,6 +53,7 @@ public class BufMgr {
 	*/
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
 		// search buffer pool for existence of page using hash
+		
 		// if found, increment pin count for page and return pointer to page
 		// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
 		// if dirty, write out before flushing from buffer
