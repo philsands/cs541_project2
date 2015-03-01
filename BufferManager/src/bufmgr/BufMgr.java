@@ -179,7 +179,13 @@ public class BufMgr {
 	*
 	* @param globalPageId the page number in the data base.
 	*/
-	public void freePage(PageId globalPageId) {}
+	public void freePage(PageId globalPageId) {
+		try{
+		disk.deallocate_page(globalPageId);
+		}catch(Exception e){
+			System.out.println("FreePage Exception");
+		}
+	}
 	
 	/**
 	* Used to flush a particular page of the buffer pool to disk.
