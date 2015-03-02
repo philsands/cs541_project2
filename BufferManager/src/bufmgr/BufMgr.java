@@ -66,13 +66,25 @@ public class BufMgr {
 				return;
 			}
 		}
-		else
+		
+		// find the new frame for new page
+		int newframe=-1;
+		for (int i = 0; i < numbufs; i++)
 		{
-			// check first if there are any empty frames for adding page to the buffer
-			
+			if (bufPool[i] != null)
+			{
+				newframe = i;
+				break;
+			}
+		}
+				
+		// no free frame
+		if (newframe==-1)
+		{	
 			// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
-			// the newframeID here is not right, should use LIRS
-			int newframeID=pageFrameDirectory.hashFunction(pageno.pid);
+			// call LIRS function to determine which frame to swap out
+			int newframeID = getLIRSCandidate();
+			
 			// if dirty, write out before flushing from buffer
 			if(bufDescr[newframeID].getDirtyBit()) flushPage(pageno);
 			try{
@@ -89,6 +101,15 @@ public class BufMgr {
 		}
 	}
 
+	private int getLIRSCandidate()
+	{
+		int frameToRemove = null;
+		
+		// for each page in bufPool, calculate Reuse Distance and Recency
+		
+		return frameToRemove;
+	}
+	
 	/**
 	 * Unpin a page specified by a pageId.
 	 * This method should be called with dirty==true if the client has
@@ -185,6 +206,7 @@ public class BufMgr {
 		
 		bufPool[newframe] = firstpage;
 		bufDescr[newframe] = new Descriptor(pgid,0,false);
+		pageFrameDirectory.insert(pgid.pid, newframe);
 		this.pinPage(pgid, bufPool[newframe], false);
 		
 		return pgid;
