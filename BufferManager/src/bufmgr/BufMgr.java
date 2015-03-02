@@ -130,7 +130,6 @@ public class BufMgr {
 					maxRDR = RD;
 					frameToRemove = i;
 				}
-					
 			}
 		}
 		
@@ -139,12 +138,32 @@ public class BufMgr {
 	
 	private int calculateReuseDistance(PageId pn)
 	{
+		int pageAccess = 0;
+		int mostRecent = 0;
+		int distance = 0;
+		for (int i = recency.size() - 1; i >= 0; i--)
+		{
+			if (recency.get(i) == pn && pageAccess == 0)
+			{
+				mostRecent = i;
+				pageAccess++;
+			}
+			else if (recency.get(i) == pn && pageAccess == 1)
+			{
+				distance = mostRecent - i;
+				return distance;
+			}
+		}
 		
+		return Integer.MAX_VALUE;	// i.e. Infinity
 	}
 	
 	private int calculateRecency(PageId pn)
 	{
+		if (recency.lastIndexOf(pn) != -1)
+			return (recency.size() - recency.lastIndexOf(pn));
 		
+		return -1;
 	}
 	
 	/**
