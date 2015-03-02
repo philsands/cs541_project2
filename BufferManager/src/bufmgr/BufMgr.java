@@ -11,9 +11,7 @@ import diskmgr.*;
 import global.PageId;
 import global.Page;
 
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.ArrayList;
 
 public class BufMgr {
@@ -98,18 +96,23 @@ public class BufMgr {
 			int newframeID = getLIRSCandidate();
 			
 			// if dirty, write out before flushing from buffer
-			if(bufDescr[newframeID].getDirtyBit()) flushPage(pageno);
-			try{
+			if(bufDescr[newframeID].getDirtyBit()) 
+				flushPage(pageno);
+			try
+			{
 				disk.read_page(pageno,page);
-			}catch(Exception e){
+			}
+			catch(Exception e)
+			{
 				System.out.print("Read Exception");
 			}
-			bufPool[newframeID]=page;
-			Descriptor des=new Descriptor(pageno,0,false);
-			bufDescr[newframeID]=des;
+			bufPool[newframeID] = page;
+			bufDescr[newframeID] = new Descriptor(pageno,0,false);
+			removeAllPageReferences(pageno);
 			pageFrameDirectory.remove(pageno);
 			pageFrameDirectory.insert(pageno,newframeID);
-
+			recency.add(pageno);
+			this.pinPage(pageno, bufPool[newframeID], false);
 		}
 	}
 
