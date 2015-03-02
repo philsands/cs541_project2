@@ -1,3 +1,10 @@
+/***
+ * Phil Sands
+ * Qiaomu Yao
+ * CS 541 - Project 2
+ * March 9, 2015
+ */
+
 package bufmgr;
 
 import diskmgr.*;
@@ -498,6 +505,7 @@ class PageFramePair {
 	public int getFrameNum() {return frameNum;}
 }
 
+/*
 class LRUCache{
 
     int size;
@@ -589,4 +597,4 @@ class LRUCache{
             this.val = v;
         }
     }
-}
+}*/
