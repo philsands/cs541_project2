@@ -108,11 +108,43 @@ public class BufMgr {
 
 	private int getLIRSCandidate()
 	{
-		PageFramePair frameToRemove = null;
+		int frameToRemove = -1;
+		int RD = 0;	// Reuse Distance
+		int R = 0;	// Recency
+		int maxRDR = 0;
 		
-		// for each page in bufPool, calculate Reuse Distance and Recency
+		// for each page in bufPool eligible to be swapped out, calculate Reuse Distance and Recency
+		for (int i = 0; i < this.getNumBuffers(); i++)
+		{
+			if (bufDescr[i].getPinCount() == 0)
+			{
+				RD = calculateReuseDistance(bufDescr[i].getPageNumber());
+				R = calculateRecency(bufDescr[i].getPageNumber());
+				
+				// determine greater of RD and R and store in RD
+				if (R > RD)
+					RD = R;
+				
+				if (RD > maxRDR)
+				{
+					maxRDR = RD;
+					frameToRemove = i;
+				}
+					
+			}
+		}
 		
-		return frameToRemove.getFrameNum();
+		return frameToRemove;
+	}
+	
+	private int calculateReuseDistance(PageId pn)
+	{
+		
+	}
+	
+	private int calculateRecency(PageId pn)
+	{
+		
 	}
 	
 	/**
@@ -133,18 +165,22 @@ public class BufMgr {
 	 */
 	public void unpinPage(PageId pageno, boolean dirty) {
 		if(dirty!=true) return;
-		if(pageFrameDirectory.hasPage(pageno)){
+		if(pageFrameDirectory.hasPage(pageno))
+		{
 			PageFramePair pagepair= pageFrameDirectory.search(pageno);
 			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
-			if(pintemp==0){//throw exception;
-
-			}else if(pintemp>0){
-				bufDescr[pagepair.getFrameNum()].decrementPinCount();
-				bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
+			if(pintemp==0)
+			{//throw exception;
 
 			}
+			else if(pintemp>0)
+			{
+				bufDescr[pagepair.getFrameNum()].decrementPinCount();
+				bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
+			}
 		}
-		else{
+		else
+		{
 			//throw exception
 		}
 	}
@@ -227,12 +263,16 @@ public class BufMgr {
 	 */
 	public void freePage(PageId globalPageId) {
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
-		try{
+		try
+		{
 			disk.deallocate_page(globalPageId);
-		}catch(Exception e){
+		}
+		catch(Exception e)
+		{
 			System.out.println("FreePage Exception");
 		}
 		pageFrameDirectory.remove(pagepair.getPageNum());
+		removeAllPageReferences(pagepair.getPageNum());
 		bufDescr[pagepair.getFrameNum()] = null;
 		bufPool[pagepair.getFrameNum()] = null;
 	}
@@ -248,13 +288,17 @@ public class BufMgr {
 		PageFramePair pagepair= pageFrameDirectory.search(pageid);
 		if (bufDescr[pagepair.getFrameNum()].getDirtyBit())
 		{
-			try{
+			try
+			{
 				disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
-			}catch(Exception e){
+			}
+			catch(Exception e)
+			{
 				System.out.println("Flush Page Error");
 			}
 		}
 		pageFrameDirectory.remove(pagepair.getPageNum());
+		removeAllPageReferences(pagepair.getPageNum());
 		bufDescr[pagepair.getFrameNum()] = null;
 		bufPool[pagepair.getFrameNum()] = null;
 	}
@@ -267,6 +311,17 @@ public class BufMgr {
 		for(int i=0;i<numbufs;i++){
 			if(bufDescr[i].getDirtyBit()==true)
 				flushPage(bufDescr[i].getPageNumber());
+		}
+	}
+	
+	private void removeAllPageReferences(PageId toRemove)
+	{
+		for (int i = 0; i < recency.size(); i++)
+		{
+			if (recency.get(i) == toRemove)
+			{
+				recency.remove(i);
+			}
 		}
 	}
 
