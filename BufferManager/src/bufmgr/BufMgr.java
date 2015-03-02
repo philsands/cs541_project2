@@ -7,6 +7,7 @@ import global.Page;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ArrayList;
 
 public class BufMgr {
 
@@ -14,6 +15,7 @@ public class BufMgr {
 	private Descriptor bufDescr[];	// array of information regarding what is in the buffer pool
 	private HashTable pageFrameDirectory;
 	private String replacementPolicy;
+	private ArrayList<PageId> recency;
 	private int numbufs;
 	private DiskMgr disk;
 
@@ -58,13 +60,14 @@ public class BufMgr {
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
 		// search buffer pool for existence of page using hash
 		if(emptyPage==true) return;
-		if(pageFrameDirectory.hasPage(pageno.pid))
+		if(pageFrameDirectory.hasPage(pageno))
 		{
-			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
+			PageFramePair pagepair= pageFrameDirectory.search(pageno);
 			// if found, increment pin count for page and return pointer to page
 			if(pagepair!=null){
 				bufDescr[pagepair.getFrameNum()].incrementPinCount();
 				page=bufPool[pagepair.getFrameNum()];
+				recency.add(pagepair.getPageNum());
 				return;
 			}
 		}
@@ -97,19 +100,19 @@ public class BufMgr {
 			bufPool[newframeID]=page;
 			Descriptor des=new Descriptor(pageno,0,false);
 			bufDescr[newframeID]=des;
-			pageFrameDirectory.remove(pageno.pid);
-			pageFrameDirectory.insert(pageno.pid,newframeID);
+			pageFrameDirectory.remove(pageno);
+			pageFrameDirectory.insert(pageno,newframeID);
 
 		}
 	}
 
 	private int getLIRSCandidate()
 	{
-		int frameToRemove = null;
+		PageFramePair frameToRemove = null;
 		
 		// for each page in bufPool, calculate Reuse Distance and Recency
 		
-		return frameToRemove;
+		return frameToRemove.getFrameNum();
 	}
 	
 	/**
@@ -130,8 +133,8 @@ public class BufMgr {
 	 */
 	public void unpinPage(PageId pageno, boolean dirty) {
 		if(dirty!=true) return;
-		if(pageFrameDirectory.hasPage(pageno.pid)){
-			PageFramePair pagepair= pageFrameDirectory.search(pageno.pid);
+		if(pageFrameDirectory.hasPage(pageno)){
+			PageFramePair pagepair= pageFrameDirectory.search(pageno);
 			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
 			if(pintemp==0){//throw exception;
 
@@ -208,7 +211,8 @@ public class BufMgr {
 		
 		bufPool[newframe] = firstpage;
 		bufDescr[newframe] = new Descriptor(pgid,0,false);
-		pageFrameDirectory.insert(pgid.pid, newframe);
+		pageFrameDirectory.insert(pgid, newframe);
+		recency.add(pgid);
 		this.pinPage(pgid, bufPool[newframe], false);
 		
 		return pgid;
@@ -222,7 +226,7 @@ public class BufMgr {
 	 * @param globalPageId the page number in the data base.
 	 */
 	public void freePage(PageId globalPageId) {
-		PageFramePair pagepair= pageFrameDirectory.search(globalPageId.pid);
+		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try{
 			disk.deallocate_page(globalPageId);
 		}catch(Exception e){
@@ -241,7 +245,7 @@ public class BufMgr {
 	 */
 
 	public void flushPage(PageId pageid) {
-		PageFramePair pagepair= pageFrameDirectory.search(pageid.pid);
+		PageFramePair pagepair= pageFrameDirectory.search(pageid);
 		if (bufDescr[pagepair.getFrameNum()].getDirtyBit())
 		{
 			try{
@@ -335,11 +339,11 @@ class HashTable {
 		tableSize = ts;
 	}
 
-	public int hashFunction(int key) {
-		return (A*key + B) % tableSize;
+	public int hashFunction(PageId key) {
+		return (A*key.pid + B) % tableSize;
 	}
 
-	public boolean insert(int pn, int fn)
+	public boolean insert(PageId pn, int fn)
 	{
 		int bucketNumber = hashFunction(pn);
 
@@ -352,7 +356,7 @@ class HashTable {
 		return false;
 	}
 
-	public PageFramePair search(int pn)
+	public PageFramePair search(PageId pn)
 	{
 		int bn = hashFunction(pn);
 		for (int i = 0; i < directory[bn].size(); i++)
@@ -365,7 +369,7 @@ class HashTable {
 		return null;
 	}
 
-	public void remove(int pn)
+	public void remove(PageId pn)
 	{
 		int bucketNumber = hashFunction(pn);
 
@@ -379,7 +383,7 @@ class HashTable {
 		}
 	}
 
-	public boolean hasPage(int pn){//hasPage with hashFunction
+	public boolean hasPage(PageId pn){//hasPage with hashFunction
 		int bn = hashFunction(pn);
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
@@ -392,7 +396,7 @@ class HashTable {
 		return false;
 	}
 
-	public boolean hasPage(int bn, int pn)
+	public boolean hasPage(int bn, PageId pn)
 	{
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
@@ -407,16 +411,16 @@ class HashTable {
 }
 
 class PageFramePair {
-	private int pageNum;
+	private PageId pageNum;
 	private int frameNum;
 
-	public PageFramePair(int pn, int fn)
+	public PageFramePair(PageId pn, int fn)
 	{
 		pageNum = pn;
 		frameNum = fn;
 	}
 
-	public int getPageNum() {return pageNum;}
+	public PageId getPageNum() {return pageNum;}
 	public int getFrameNum() {return frameNum;}
 }
 
