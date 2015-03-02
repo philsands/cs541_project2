@@ -3,6 +3,8 @@ package bufmgr;
 import diskmgr.*;
 import global.PageId;
 import global.Page;
+
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -396,3 +398,95 @@ class PageFramePair {
 	public int getFrameNum() {return frameNum;}
 }
 
+class LRUCache{
+
+    int size;
+    int capacity;
+
+    DoubleLinkedList head;
+    DoubleLinkedList tail;
+    HashMap<Integer, DoubleLinkedList> map;
+
+    public LRUCache(int capacity) {
+        this.size = 0;
+        this.capacity = capacity;
+        head = null;
+        tail = null;
+        map = new HashMap<Integer, DoubleLinkedList>();
+    }
+
+    public void remove(DoubleLinkedList node) {
+        if (node == head && node == tail) {
+            head = null;
+            tail = null;
+        } else if (node == head) {
+            head.next.prev = null;
+            head = head.next;
+        } else if (node == tail) {
+            tail.prev.next = null;
+            tail = tail.prev;
+        } else {
+            node.prev.next = node.next;
+            node.next.prev = node.prev;
+        }
+        node.prev = null;
+        node.next = null;
+    }
+
+    public void setHead(DoubleLinkedList node) {
+        node.next = head;
+        node.prev = null;
+        if (head != null) {
+            head.prev = node;
+        }
+
+        head = node;
+        if (tail == null) {
+            tail = node;
+        }
+    }
+
+    public int get(int key) {
+        if (!map.containsKey(key)) {
+            // if key is not found
+            return -1;
+        } else {
+            // if key is found
+            DoubleLinkedList target = map.get(key);
+            remove(target);
+            setHead(target);
+            return head.val;
+        }
+    }
+
+    public void set(int key, int value) {
+        if (this.get(key) != -1) {
+            // key exist before, just replace the old value
+            DoubleLinkedList old = map.get(key);
+            old.val = value;
+        } else {
+            // this is a new key-value pair, insert it
+            DoubleLinkedList newHead = new DoubleLinkedList(key, value);
+            map.put(key, newHead);
+            setHead(newHead);
+            if (size == capacity) {
+                // delete tail
+                map.remove(tail.key);
+                remove(tail);
+            } else {
+                size++;
+            }
+        }
+    }
+
+    class DoubleLinkedList {
+        int key;
+        int val;
+        DoubleLinkedList prev;
+        DoubleLinkedList next;
+        public DoubleLinkedList(int k, int v) {
+            this.key = k;
+            this.val = v;
+        }
+    }
+}
