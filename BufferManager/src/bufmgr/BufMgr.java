@@ -11,8 +11,11 @@ import diskmgr.*;
 import global.PageId;
 import global.Page;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.ArrayList;
+
+import chainexception.ChainException;
 
 public class BufMgr {
 
@@ -102,7 +105,7 @@ public class BufMgr {
 			{
 				disk.read_page(pageno,page);
 			}
-			catch(Exception e)
+			catch(FileIOException | InvalidPageNumberException | IOException e)
 			{
 				System.out.print("Read Exception");
 			}
@@ -191,8 +194,10 @@ public class BufMgr {
 	 *
 	 * @param pageno page number in the Minibase.
 	 * @param dirty the dirty bit of the frame
+	 * @throws PageUnpinnedException 
+	 * @throws HashEntryNotFoundException 
 	 */
-	public void unpinPage(PageId pageno, boolean dirty) {
+	public void unpinPage(PageId pageno, boolean dirty) throws PageUnpinnedException, HashEntryNotFoundException {
 		if(dirty!=true) return;
 		if(pageFrameDirectory.hasPage(pageno))
 		{
@@ -200,7 +205,7 @@ public class BufMgr {
 			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
 			if(pintemp==0)
 			{//throw exception;
-
+				throw new PageUnpinnedException(null,"BUFMGR: Page Unpinned");
 			}
 			else if(pintemp>0)
 			{
@@ -211,6 +216,7 @@ public class BufMgr {
 		else
 		{
 			//throw exception
+			throw new HashEntryNotFoundException(null,"HashEntryNotFoundException");
 		}
 	}
 
@@ -235,7 +241,7 @@ public class BufMgr {
 		{
 			pgid=disk.allocate_page(howmany);
 		} 
-		catch(Exception e)
+		catch(ChainException | IOException e)
 		{
 			System.out.print("Allocate error");
 		}
@@ -243,7 +249,7 @@ public class BufMgr {
 		{
 			disk.read_page(pgid,firstpage);
 		} 
-		catch(Exception e)
+		catch(ChainException | IOException e)
 		{
 			System.out.print("Read_Page error");
 		}
@@ -267,7 +273,7 @@ public class BufMgr {
 			{
 				disk.deallocate_page(pgid, howmany);
 			} 
-			catch(Exception e)
+			catch(ChainException | IOException e)
 			{
 				System.out.print("Deallocate error");
 			}
@@ -296,7 +302,7 @@ public class BufMgr {
 		{
 			disk.deallocate_page(globalPageId);
 		}
-		catch(Exception e)
+		catch(ChainException e)
 		{
 			System.out.println("FreePage Exception");
 		}
@@ -321,7 +327,7 @@ public class BufMgr {
 			{
 				disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
 			}
-			catch(Exception e)
+			catch(ChainException | IOException e)
 			{
 				System.out.println("Flush Page Error");
 			}
