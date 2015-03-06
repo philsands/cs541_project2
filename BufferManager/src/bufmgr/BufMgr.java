@@ -64,8 +64,9 @@ public class BufMgr {
 	 * @param pageno page number in the Minibase.
 	 * @param page the pointer point to the page.
 	 * @param emptyPage true (empty page); false (non-empty page)
+	 * @throws BufferPoolExceededException 
 	 */
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException {
 		// search buffer pool for existence of page using hash
 		if(emptyPage==true) return;
 		if(pageFrameDirectory.hasPage(pageno))
@@ -116,6 +117,9 @@ public class BufMgr {
 			pageFrameDirectory.insert(pageno,newframeID);
 			recency.add(pageno);
 			this.pinPage(pageno, bufPool[newframeID], false);
+			
+			// throw bufferPoolExceededException
+			throw new BufferPoolExceededException(null,"BUFMGR: Buffer Pool Exceeded");
 		}
 	}
 
@@ -284,8 +288,14 @@ public class BufMgr {
 		bufDescr[newframe] = new Descriptor(pgid,0,false);
 		pageFrameDirectory.insert(pgid, newframe);
 		recency.add(pgid);
-		this.pinPage(pgid, bufPool[newframe], false);
-		
+		try
+		{
+			this.pinPage(pgid, bufPool[newframe], false);
+		}
+		catch (Exception e)
+		{
+			System.out.println(e);
+		}
 		return pgid;
 	}
 
@@ -295,8 +305,9 @@ public class BufMgr {
 	 * deallocate the page.
 	 *
 	 * @param globalPageId the page number in the data base.
+	 * @throws PagePinnedException 
 	 */
-	public void freePage(PageId globalPageId) {
+	public void freePage(PageId globalPageId) throws PagePinnedException {
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try
 		{
@@ -304,7 +315,8 @@ public class BufMgr {
 		}
 		catch(ChainException e)
 		{
-			System.out.println("FreePage Exception");
+			// not sure this is right, but we are expected to throw a Page Pinned Exception
+			throw new PagePinnedException(e,"BUFMGR: Page Pinned");
 		}
 		pageFrameDirectory.remove(pagepair.getPageNum());
 		removeAllPageReferences(pagepair.getPageNum());
