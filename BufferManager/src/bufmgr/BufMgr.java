@@ -487,6 +487,7 @@ class HashTable {
 
 	public boolean hasPage(PageId pn){//hasPage with hashFunction
 		int bn = hashFunction(pn);
+		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 
@@ -500,6 +501,7 @@ class HashTable {
 
 	public boolean hasPage(int bn, PageId pn)
 	{
+		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 
