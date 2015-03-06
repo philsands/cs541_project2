@@ -64,9 +64,8 @@ public class BufMgr {
 	 * @param pageno page number in the Minibase.
 	 * @param page the pointer point to the page.
 	 * @param emptyPage true (empty page); false (non-empty page)
-	 * @throws BufferPoolExceededException 
 	 */
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException {
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
 		// search buffer pool for existence of page using hash
 		if(emptyPage==true) return;
 		if(pageFrameDirectory.hasPage(pageno))
@@ -85,7 +84,7 @@ public class BufMgr {
 		int newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] != null)
+			if (bufPool[i] == null)
 			{
 				newframe = i;
 				break;
@@ -106,7 +105,7 @@ public class BufMgr {
 			{
 				disk.read_page(pageno,page);
 			}
-			catch(FileIOException | InvalidPageNumberException | IOException e)
+			catch(FileIOException | ChainException | IOException e)
 			{
 				System.out.print("Read Exception");
 			}
@@ -117,9 +116,6 @@ public class BufMgr {
 			pageFrameDirectory.insert(pageno,newframeID);
 			recency.add(pageno);
 			this.pinPage(pageno, bufPool[newframeID], false);
-			
-			// throw bufferPoolExceededException
-			throw new BufferPoolExceededException(null,"BUFMGR: Buffer Pool Exceeded");
 		}
 	}
 
@@ -236,11 +232,17 @@ public class BufMgr {
 	 * @param howmany total number of allocated new pages.
 	 *
 	 * @return the first page id of the new pages.__ null, if error.
+	 * @throws ChainException 
+	 * @throws IOException 
 	 */
-	public PageId newPage(Page firstpage, int howmany) 
+	public PageId newPage(Page firstpage, int howmany) throws IOException, ChainException 
 	{
+		
+		
+		
 		// allocate new pages
 		PageId pgid = null;
+		
 		try
 		{
 			pgid=disk.allocate_page(howmany);
@@ -249,6 +251,23 @@ public class BufMgr {
 		{
 			System.out.print("Allocate error");
 		}
+		
+		//if no more space 
+		int newframe=-1;
+		int bufcount=0;
+		for (int i = 0; i < numbufs; i++)
+		{
+			if (bufPool[i] == null)
+			{
+				bufcount++;
+			}
+		}
+		if(bufcount<howmany){
+			//may need exception
+			disk.deallocate_page(pgid, howmany);
+			return null;
+		}
+		
 		try
 		{
 			disk.read_page(pgid,firstpage);
@@ -257,12 +276,11 @@ public class BufMgr {
 		{
 			System.out.print("Read_Page error");
 		}
-		
 		// find the new frame for new page
-		int newframe=-1;
+		
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] != null)
+			if (bufPool[i] == null)
 			{
 				newframe = i;
 				break;
@@ -288,14 +306,8 @@ public class BufMgr {
 		bufDescr[newframe] = new Descriptor(pgid,0,false);
 		pageFrameDirectory.insert(pgid, newframe);
 		recency.add(pgid);
-		try
-		{
-			this.pinPage(pgid, bufPool[newframe], false);
-		}
-		catch (Exception e)
-		{
-			System.out.println(e);
-		}
+		this.pinPage(pgid, bufPool[newframe], false);
+		
 		return pgid;
 	}
 
@@ -305,9 +317,8 @@ public class BufMgr {
 	 * deallocate the page.
 	 *
 	 * @param globalPageId the page number in the data base.
-	 * @throws PagePinnedException 
 	 */
-	public void freePage(PageId globalPageId) throws PagePinnedException {
+	public void freePage(PageId globalPageId) {
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try
 		{
@@ -315,8 +326,7 @@ public class BufMgr {
 		}
 		catch(ChainException e)
 		{
-			// not sure this is right, but we are expected to throw a Page Pinned Exception
-			throw new PagePinnedException(e,"BUFMGR: Page Pinned");
+			System.out.println("FreePage Exception");
 		}
 		pageFrameDirectory.remove(pagepair.getPageNum());
 		removeAllPageReferences(pagepair.getPageNum());
@@ -487,7 +497,6 @@ class HashTable {
 
 	public boolean hasPage(PageId pn){//hasPage with hashFunction
 		int bn = hashFunction(pn);
-		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 
@@ -501,7 +510,6 @@ class HashTable {
 
 	public boolean hasPage(int bn, PageId pn)
 	{
-		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 

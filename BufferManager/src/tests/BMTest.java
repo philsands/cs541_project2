@@ -1,5 +1,6 @@
 package tests;
 
+
 import global.Convert;
 import global.GlobalConst;
 import global.Minibase;
@@ -389,6 +390,7 @@ class BMDriver extends TestDriver implements GlobalConst {
 						System.err.print("*** Freeing a pinned page\n");
 						System.out.println ("  --> Failed as expected \n");
 					}
+					else{}
 				}
 
 				catch (Exception e) {
