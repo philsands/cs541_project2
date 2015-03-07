@@ -41,7 +41,12 @@ public class BufMgr implements GlobalConst{
 		bufPool = new Page[numbufs];
 		
 		bufDescr = new Descriptor[numbufs];
-		pageFrameDirectory = new HashTable(13);	// 13 is arbitrarily chosen prime number for now
+		for(int i=0;i<numbufs;i++){
+			PageId pageid=new PageId();
+			pageid.pid=INVALID_PAGEID;
+			bufDescr[i]=new Descriptor(pageid,0,false);
+		}
+		pageFrameDirectory = new HashTable(20);	// 20 is arbitrarily chosen prime number for now
 		this.numbufs = numbufs;
 		// ignore lookAheadSize
 		this.replacementPolicy = replacementPolicy;
@@ -65,12 +70,18 @@ public class BufMgr implements GlobalConst{
 	 * @param page the pointer point to the page.
 	 * @param emptyPage true (empty page); false (non-empty page)
 	 * @throws BufferPoolExceededException 
+	 * @throws InvalidPageNumberException 
+	 * @throws HashEntryNotFoundException 
 	 */
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException {
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException, InvalidPageNumberException, HashEntryNotFoundException {
 		// search buffer pool for existence of page using hash
-		if(emptyPage==true) return;
+		//if(emptyPage==true) return;
+		PageId writablePageID=new PageId(INVALID_PAGEID);
+		boolean writable=false;
+		System.out.println("Pin Page");
 		if(pageFrameDirectory.hasPage(pageno))
 		{
+			System.out.println("HashTab Has this page");
 			PageFramePair pagepair= pageFrameDirectory.search(pageno);
 			// if found, increment pin count for page and return pointer to page
 			if(pagepair!=null){
@@ -85,7 +96,7 @@ public class BufMgr implements GlobalConst{
 		int newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] != null)
+			if (bufPool[i] == null)
 			{
 				newframe = i;
 				break;
@@ -93,42 +104,62 @@ public class BufMgr implements GlobalConst{
 		}
 				
 		// no free frame
-		if (newframe==-1)
-		{	
+		if(newframe==-1){
+			newframe=getLIRSCandidate();
+		}
+		
+			
 			// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
 			// call LIRS function to determine which frame to swap out
-			int newframeID = getLIRSCandidate();
-			
 			// if dirty, write out before flushing from buffer
-			if(bufDescr[newframeID].getDirtyBit()) 
+		System.out.println(newframe);
+			if(bufDescr[newframe].getDirtyBit()&&bufDescr[newframe].getPageNumber().pid!=INVALID_PAGEID) 
 			{
+				writable=true;
+				writablePageID.pid=bufDescr[newframe].getPageNumber().pid;
+				
+			}
+			
+			if(!pageFrameDirectory.remove(bufDescr[newframe].getPageNumber())){
+				throw new InvalidPageNumberException(null,"Cannot remove Invalid Num");
+			}
+			bufDescr[newframe].getPageNumber().pid=pageno.pid;
+			bufDescr[newframe].setDirtyBit(false);
+			
+			if(!pageFrameDirectory.insert(pageno, newframe)){
+				throw new HashEntryNotFoundException(null,"Cannot insert Invalid Num");
+			}
+			Page writablePage=new Page();
+			writablePage.copyPage(bufPool[newframe]);
+			if(writable){
 				try{
-				flushPage(pageno);
-				}catch(FileIOException|IOException|InvalidPageNumberException e){
-					System.out.print("flush_Page error");
+				Minibase.DiskManager.write_page(writablePageID, writablePage);
+				}
+				catch(Exception e){
+					System.out.println("Write page exception");
 				}
 			}
-			try
-			{
-				Minibase.DiskManager.read_page(pageno,page);
+			
+			if(emptyPage==false){
+				try{
+					writablePage.setpage(bufPool[newframe].getData());
+					Minibase.DiskManager.read_page(pageno, writablePage);				
+					}catch(Exception e){
+						System.out.println("Page Not Read");
+					}
 			}
-			catch(FileIOException | InvalidPageNumberException | IOException e)
-			{
-				System.out.print("Read Exception");
-			}
-			bufPool[newframeID] = page;
-			bufDescr[newframeID] = new Descriptor(pageno,0,false);
-			removeAllPageReferences(pageno);
-			pageFrameDirectory.remove(pageno);
-			pageFrameDirectory.insert(pageno,newframeID);
+			
+			
 			recency.add(pageno);
-			this.pinPage(pageno, bufPool[newframeID], false);
+			
 
 
 			// throw bufferPoolExceededException
-			throw new BufferPoolExceededException(null,"BUFMGR: Buffer Pool Exceeded");
-
-		}
+			
+			if(getNumUnpinned()==0){
+				throw new BufferPoolExceededException(null,"bufferPoolExceededException");
+			}
+		
 	}
 
 	private int getLIRSCandidate()
@@ -212,8 +243,10 @@ public class BufMgr implements GlobalConst{
 	 */
 	public void unpinPage(PageId pageno, boolean dirty) throws PageUnpinnedException, HashEntryNotFoundException,InvalidPageNumberException {
 		if(dirty!=true) return;
+		System.out.println("unpinPage");
 		if(pageFrameDirectory.hasPage(pageno))
 		{
+			System.out.print("unpinPage-haspage");
 			PageFramePair pagepair= pageFrameDirectory.search(pageno);
 			if(pagepair.getPageNum().pid==INVALID_PAGEID){
 				throw new InvalidPageNumberException(null,"Invalid Page Number");
@@ -254,6 +287,7 @@ public class BufMgr implements GlobalConst{
 	{
 		// allocate new pages
 		PageId pgid = null;
+		System.out.println("newPage");
 		try
 		{
 			pgid=Minibase.DiskManager.allocate_page(howmany);
@@ -303,7 +337,7 @@ public class BufMgr implements GlobalConst{
 		newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] != null)
+			if (bufPool[i] == null)
 			{
 				newframe = i;
 				break;
@@ -349,6 +383,7 @@ public class BufMgr implements GlobalConst{
 	 * @throws PagePinnedException 
 	 */
 	public void freePage(PageId globalPageId) throws PagePinnedException {
+		System.out.println("freePage");
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try
 		{
@@ -375,6 +410,7 @@ public class BufMgr implements GlobalConst{
 	 */
 
 	public void flushPage(PageId pageid) throws InvalidPageNumberException, FileIOException, IOException{
+		System.out.println("flushPage");
 		PageFramePair pagepair= pageFrameDirectory.search(pageid);
 		if(pagepair.getFrameNum()==INVALID_PAGEID){
 			throw new InvalidPageNumberException(null,"Invalid pageNumber");
@@ -479,7 +515,7 @@ class Descriptor {
 
 }
 
-class HashTable {
+class HashTable implements GlobalConst{
 	private LinkedList<PageFramePair> directory[];
 	private int tableSize;
 	public static final int A = 42;		// these numbers have no real significance and were chosen for a consistent hash
@@ -487,6 +523,7 @@ class HashTable {
 
 	public HashTable(int ts)
 	{
+		System.out.println("HashTable");
 		directory = new LinkedList[ts];
 		tableSize = ts;
 	}
@@ -497,6 +534,7 @@ class HashTable {
 
 	public boolean insert(PageId pn, int fn)
 	{
+		System.out.println("Hash insert");
 		int bucketNumber = hashFunction(pn);
 
 		if (!hasPage(bucketNumber, pn))
@@ -510,6 +548,7 @@ class HashTable {
 
 	public PageFramePair search(PageId pn)
 	{
+		System.out.println("Hash search");
 		int bn = hashFunction(pn);
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
@@ -521,21 +560,24 @@ class HashTable {
 		return null;
 	}
 
-	public void remove(PageId pn)
+	public boolean remove(PageId pn)
 	{
+		System.out.println("Hash remove");
 		int bucketNumber = hashFunction(pn);
-
+		if(pn.pid==INVALID_PAGEID) return true;
 		for (int i = 0; i < directory[bucketNumber].size(); i++)
 		{
 			if ((directory[bucketNumber].get(i)).getPageNum() == pn) 
 			{
 				directory[bucketNumber].remove(i);
-				break;
+				return true;
 			}
 		}
+		return false;
 	}
 
 	public boolean hasPage(PageId pn){//hasPage with hashFunction
+		System.out.println("Hash haspage1");
 		int bn = hashFunction(pn);
 		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
@@ -551,6 +593,7 @@ class HashTable {
 
 	public boolean hasPage(int bn, PageId pn)
 	{
+		System.out.println("Hash haspage2");
 		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
