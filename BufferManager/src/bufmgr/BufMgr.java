@@ -101,7 +101,13 @@ public class BufMgr implements GlobalConst{
 			
 			// if dirty, write out before flushing from buffer
 			if(bufDescr[newframeID].getDirtyBit()) 
+			{
+				try{
 				flushPage(pageno);
+				}catch(FileIOException|IOException|InvalidPageNumberException e){
+					System.out.print("flush_Page error");
+				}
+			}
 			try
 			{
 				Minibase.DiskManager.read_page(pageno,page);
@@ -270,19 +276,22 @@ public class BufMgr implements GlobalConst{
 		}
 		if(bufcount<howmany){
 			//may need exception
-			Minibase.DiskManager.deallocate_page(pgid, howmany);
-			return null;
+			try{
+				Minibase.DiskManager.deallocate_page(pgid, howmany);
+				return null;	
+			}catch(ChainException|IOException e){
+				System.out.print("Read_Page error");
+			}
 		}
 		
 		
-		Minibase.DiskManager.read_page(pgid,firstpage);
 		
 		
 		// find the new frame for new page
 
 		try
 		{
-			disk.read_page(pgid,firstpage);
+			Minibase.DiskManager.read_page(pgid,firstpage);
 		} 
 		catch(ChainException | IOException e)
 		{
@@ -394,7 +403,11 @@ public class BufMgr implements GlobalConst{
 	public void flushAllPages() {
 		for(int i=0;i<numbufs;i++){
 			if(bufDescr[i].getDirtyBit()==true)
+				try{
 				flushPage(bufDescr[i].getPageNumber());
+				}catch(IOException|FileIOException|InvalidPageNumberException e){
+					System.out.print("Flush_Page error");
+				}
 		}
 	}
 	
