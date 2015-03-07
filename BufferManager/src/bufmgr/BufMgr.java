@@ -117,13 +117,11 @@ public class BufMgr implements GlobalConst{
 			pageFrameDirectory.insert(pageno,newframeID);
 			recency.add(pageno);
 			this.pinPage(pageno, bufPool[newframeID], false);
-<<<<<<< HEAD
-			throw new BufferPoolExceededException(null,"BufPoolExceed");
-=======
-			
+
+
 			// throw bufferPoolExceededException
 			throw new BufferPoolExceededException(null,"BUFMGR: Buffer Pool Exceeded");
->>>>>>> 8dbdfa428950de981321afe2a5cb2dc69de39962
+
 		}
 	}
 
@@ -258,7 +256,7 @@ public class BufMgr implements GlobalConst{
 		{
 			System.out.print("Allocate error");
 		}
-<<<<<<< HEAD
+
 		
 		//if no more space 
 		int newframe=-1;
@@ -281,7 +279,7 @@ public class BufMgr implements GlobalConst{
 		
 		
 		// find the new frame for new page
-=======
+
 		try
 		{
 			disk.read_page(pgid,firstpage);
@@ -290,10 +288,10 @@ public class BufMgr implements GlobalConst{
 		{
 			System.out.print("Read_Page error");
 		}
->>>>>>> 8dbdfa428950de981321afe2a5cb2dc69de39962
+
 		
 		// find the new frame for new page
-		int newframe=-1;
+		newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
 			if (bufPool[i] != null)
