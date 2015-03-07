@@ -75,10 +75,12 @@ public class BufMgr implements GlobalConst{
 	 */
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException, InvalidPageNumberException, HashEntryNotFoundException {
 		// search buffer pool for existence of page using hash
+
 		//if(emptyPage==true) return;
 		PageId writablePageID=new PageId(INVALID_PAGEID);
 		boolean writable=false;
 		System.out.println("Pin Page");
+
 		if(pageFrameDirectory.hasPage(pageno))
 		{
 			System.out.println("HashTab Has this page");
