@@ -68,7 +68,7 @@ public class BufMgr implements GlobalConst{
 	 */
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException {
 		// search buffer pool for existence of page using hash
-		if(emptyPage==true) return;
+		//if(emptyPage==true) return;
 		if(pageFrameDirectory.hasPage(pageno))
 		{
 			PageFramePair pagepair= pageFrameDirectory.search(pageno);
