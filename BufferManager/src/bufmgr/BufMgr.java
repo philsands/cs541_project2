@@ -64,8 +64,9 @@ public class BufMgr implements GlobalConst{
 	 * @param pageno page number in the Minibase.
 	 * @param page the pointer point to the page.
 	 * @param emptyPage true (empty page); false (non-empty page)
+	 * @throws BufferPoolExceededException 
 	 */
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) {
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException {
 		// search buffer pool for existence of page using hash
 		if(emptyPage==true) return;
 		if(pageFrameDirectory.hasPage(pageno))
@@ -84,7 +85,7 @@ public class BufMgr implements GlobalConst{
 		int newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] == null)
+			if (bufPool[i] != null)
 			{
 				newframe = i;
 				break;
@@ -105,7 +106,7 @@ public class BufMgr implements GlobalConst{
 			{
 				Minibase.DiskManager.read_page(pageno,page);
 			}
-			catch(FileIOException | ChainException | IOException e)
+			catch(FileIOException | InvalidPageNumberException | IOException e)
 			{
 				System.out.print("Read Exception");
 			}
@@ -116,7 +117,13 @@ public class BufMgr implements GlobalConst{
 			pageFrameDirectory.insert(pageno,newframeID);
 			recency.add(pageno);
 			this.pinPage(pageno, bufPool[newframeID], false);
+<<<<<<< HEAD
 			throw new BufferPoolExceededException(null,"BufPoolExceed");
+=======
+			
+			// throw bufferPoolExceededException
+			throw new BufferPoolExceededException(null,"BUFMGR: Buffer Pool Exceeded");
+>>>>>>> 8dbdfa428950de981321afe2a5cb2dc69de39962
 		}
 	}
 
@@ -238,17 +245,11 @@ public class BufMgr implements GlobalConst{
 	 * @param howmany total number of allocated new pages.
 	 *
 	 * @return the first page id of the new pages.__ null, if error.
-	 * @throws ChainException 
-	 * @throws IOException 
 	 */
-	public PageId newPage(Page firstpage, int howmany) throws IOException, ChainException 
+	public PageId newPage(Page firstpage, int howmany) 
 	{
-		
-		
-		
 		// allocate new pages
 		PageId pgid = null;
-		
 		try
 		{
 			pgid=Minibase.DiskManager.allocate_page(howmany);
@@ -257,6 +258,7 @@ public class BufMgr implements GlobalConst{
 		{
 			System.out.print("Allocate error");
 		}
+<<<<<<< HEAD
 		
 		//if no more space 
 		int newframe=-1;
@@ -279,10 +281,22 @@ public class BufMgr implements GlobalConst{
 		
 		
 		// find the new frame for new page
+=======
+		try
+		{
+			disk.read_page(pgid,firstpage);
+		} 
+		catch(ChainException | IOException e)
+		{
+			System.out.print("Read_Page error");
+		}
+>>>>>>> 8dbdfa428950de981321afe2a5cb2dc69de39962
 		
+		// find the new frame for new page
+		int newframe=-1;
 		for (int i = 0; i < numbufs; i++)
 		{
-			if (bufPool[i] == null)
+			if (bufPool[i] != null)
 			{
 				newframe = i;
 				break;
@@ -308,8 +322,14 @@ public class BufMgr implements GlobalConst{
 		bufDescr[newframe] = new Descriptor(pgid,0,false);
 		pageFrameDirectory.insert(pgid, newframe);
 		recency.add(pgid);
-		this.pinPage(pgid, bufPool[newframe], false);
-		
+		try
+		{
+			this.pinPage(pgid, bufPool[newframe], false);
+		}
+		catch (Exception e)
+		{
+			System.out.println(e);
+		}
 		return pgid;
 	}
 
@@ -319,8 +339,9 @@ public class BufMgr implements GlobalConst{
 	 * deallocate the page.
 	 *
 	 * @param globalPageId the page number in the data base.
+	 * @throws PagePinnedException 
 	 */
-	public void freePage(PageId globalPageId) {
+	public void freePage(PageId globalPageId) throws PagePinnedException {
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try
 		{
@@ -328,7 +349,8 @@ public class BufMgr implements GlobalConst{
 		}
 		catch(ChainException e)
 		{
-			System.out.println("FreePage Exception");
+			// not sure this is right, but we are expected to throw a Page Pinned Exception
+			throw new PagePinnedException(e,"BUFMGR: Page Pinned");
 		}
 		pageFrameDirectory.remove(pagepair.getPageNum());
 		removeAllPageReferences(pagepair.getPageNum());
@@ -504,6 +526,7 @@ class HashTable {
 
 	public boolean hasPage(PageId pn){//hasPage with hashFunction
 		int bn = hashFunction(pn);
+		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 
@@ -517,6 +540,7 @@ class HashTable {
 
 	public boolean hasPage(int bn, PageId pn)
 	{
+		if (directory[bn] == null) return false;
 		for (int i = 0; i < directory[bn].size(); i++)
 		{
 			if ((directory[bn].get(i)).getPageNum() == pn) 
