@@ -127,12 +127,13 @@ public class BufMgr implements GlobalConst{
 			if(!pageFrameDirectory.remove(bufDescr[newframe].getPageNumber())){
 				throw new InvalidPageNumberException(null,"Cannot remove Invalid Num");
 			}
-			bufDescr[newframe].getPageNumber().pid=pageno.pid;
+			bufDescr[newframe].setPageNumber(pageno);
 			bufDescr[newframe].setDirtyBit(false);
 			
 			if(!pageFrameDirectory.insert(pageno, newframe)){
 				throw new HashEntryNotFoundException(null,"Cannot insert Invalid Num");
 			}
+			bufDescr[newframe].incrementPinCount();
 			Page writablePage;
 			if(bufPool[newframe]!=null){
 				writablePage=new Page(bufPool[newframe].getData());
@@ -262,6 +263,7 @@ public class BufMgr implements GlobalConst{
 			if(pagepair.getPageNum().pid==INVALID_PAGEID){
 				throw new InvalidPageNumberException(null,"Invalid Page Number");
 			}
+			
 			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
 			if(pintemp==0)
 			{
@@ -271,8 +273,9 @@ public class BufMgr implements GlobalConst{
 			else if(pintemp>0)
 			{
 				bufDescr[pagepair.getFrameNum()].decrementPinCount();
-				bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
+				
 			}
+			bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
 		}
 		else
 		{
@@ -511,6 +514,9 @@ class Descriptor {
 	{
 		pinCount++;
 		return pinCount;
+	}
+	public void setPageNumber(PageId id){
+		this.pageNumber=id;
 	}
 	public int decrementPinCount()
 	{
