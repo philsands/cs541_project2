@@ -8,8 +8,8 @@
 package bufmgr;
 
 import diskmgr.*;
-import global.PageId;
-import global.Page;
+import global.*;
+
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -17,7 +17,7 @@ import java.util.ArrayList;
 
 import chainexception.ChainException;
 
-public class BufMgr {
+public class BufMgr implements GlobalConst{
 
 	private Page bufPool[];			// array to manage buffer pool
 	private Descriptor bufDescr[];	// array of information regarding what is in the buffer pool
@@ -25,7 +25,7 @@ public class BufMgr {
 	private String replacementPolicy;
 	private ArrayList<PageId> recency;
 	private int numbufs;
-	private DiskMgr disk;
+	
 
 	/**
 	 * Create the BufMgr object.
@@ -39,7 +39,7 @@ public class BufMgr {
 	public BufMgr(int numbufs, int lookAheadSize, String replacementPolicy) {
 		// initialize all buffer pool components
 		bufPool = new Page[numbufs];
-		disk=new DiskMgr();
+		
 		bufDescr = new Descriptor[numbufs];
 		pageFrameDirectory = new HashTable(13);	// 13 is arbitrarily chosen prime number for now
 		this.numbufs = numbufs;
@@ -103,7 +103,7 @@ public class BufMgr {
 				flushPage(pageno);
 			try
 			{
-				disk.read_page(pageno,page);
+				Minibase.DiskManager.read_page(pageno,page);
 			}
 			catch(FileIOException | ChainException | IOException e)
 			{
@@ -116,6 +116,7 @@ public class BufMgr {
 			pageFrameDirectory.insert(pageno,newframeID);
 			recency.add(pageno);
 			this.pinPage(pageno, bufPool[newframeID], false);
+			throw new BufferPoolExceededException(null,"BufPoolExceed");
 		}
 	}
 
@@ -194,17 +195,22 @@ public class BufMgr {
 	 *
 	 * @param pageno page number in the Minibase.
 	 * @param dirty the dirty bit of the frame
-	 * @throws PageUnpinnedException 
-	 * @throws HashEntryNotFoundException 
+	 * @exception PageUnpinnedException 
+	 * @exception HashEntryNotFoundException 
+	 * @exception PageUnpinnedException
 	 */
-	public void unpinPage(PageId pageno, boolean dirty) throws PageUnpinnedException, HashEntryNotFoundException {
+	public void unpinPage(PageId pageno, boolean dirty) throws PageUnpinnedException, HashEntryNotFoundException,InvalidPageNumberException {
 		if(dirty!=true) return;
 		if(pageFrameDirectory.hasPage(pageno))
 		{
 			PageFramePair pagepair= pageFrameDirectory.search(pageno);
+			if(pagepair.getPageNum().pid==INVALID_PAGEID){
+				throw new InvalidPageNumberException(null,"Invalid Page Number");
+			}
 			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
 			if(pintemp==0)
-			{//throw exception;
+			{
+				//throw exception;
 				throw new PageUnpinnedException(null,"BUFMGR: Page Unpinned");
 			}
 			else if(pintemp>0)
@@ -245,7 +251,7 @@ public class BufMgr {
 		
 		try
 		{
-			pgid=disk.allocate_page(howmany);
+			pgid=Minibase.DiskManager.allocate_page(howmany);
 		} 
 		catch(ChainException | IOException e)
 		{
@@ -264,18 +270,14 @@ public class BufMgr {
 		}
 		if(bufcount<howmany){
 			//may need exception
-			disk.deallocate_page(pgid, howmany);
+			Minibase.DiskManager.deallocate_page(pgid, howmany);
 			return null;
 		}
 		
-		try
-		{
-			disk.read_page(pgid,firstpage);
-		} 
-		catch(ChainException | IOException e)
-		{
-			System.out.print("Read_Page error");
-		}
+		
+		Minibase.DiskManager.read_page(pgid,firstpage);
+		
+		
 		// find the new frame for new page
 		
 		for (int i = 0; i < numbufs; i++)
@@ -293,7 +295,7 @@ public class BufMgr {
 			//buffer is full, deallocate new pages
 			try
 			{
-				disk.deallocate_page(pgid, howmany);
+				Minibase.DiskManager.deallocate_page(pgid, howmany);
 			} 
 			catch(ChainException | IOException e)
 			{
@@ -322,7 +324,7 @@ public class BufMgr {
 		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
 		try
 		{
-			disk.deallocate_page(globalPageId);
+			Minibase.DiskManager.deallocate_page(globalPageId);
 		}
 		catch(ChainException e)
 		{
@@ -339,25 +341,30 @@ public class BufMgr {
 	 * This method calls the write_page method of the diskmgr package.
 	 *
 	 * @param pageid the page number in the database.
+	 * @throws IOException 
+	 * @throws FileIOException 
 	 */
 
-	public void flushPage(PageId pageid) {
+	public void flushPage(PageId pageid) throws InvalidPageNumberException, FileIOException, IOException{
 		PageFramePair pagepair= pageFrameDirectory.search(pageid);
+		if(pagepair.getFrameNum()==INVALID_PAGEID){
+			throw new InvalidPageNumberException(null,"Invalid pageNumber");
+		}
+		if(bufDescr[pagepair.getFrameNum()].getPageNumber().pid==INVALID_PAGEID){
+			throw new InvalidPageNumberException(null,"Invalid pageNumber");
+		}
+		
 		if (bufDescr[pagepair.getFrameNum()].getDirtyBit())
 		{
-			try
-			{
-				disk.write_page(pageid, bufPool[pagepair.getFrameNum()]);
-			}
-			catch(ChainException | IOException e)
-			{
-				System.out.println("Flush Page Error");
-			}
+			final PageId targetPageId = new PageId(bufDescr[pagepair.getFrameNum()].getPageNumber().pid);	
+			Minibase.DiskManager.write_page(targetPageId, bufPool[pagepair.getFrameNum()]);
+				
+				
+			pageFrameDirectory.remove(pagepair.getPageNum());
+			removeAllPageReferences(pagepair.getPageNum());
+			bufDescr[pagepair.getFrameNum()] = null;
+			bufPool[pagepair.getFrameNum()] = null;
 		}
-		pageFrameDirectory.remove(pagepair.getPageNum());
-		removeAllPageReferences(pagepair.getPageNum());
-		bufDescr[pagepair.getFrameNum()] = null;
-		bufPool[pagepair.getFrameNum()] = null;
 	}
 
 	/**
