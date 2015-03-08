@@ -43,10 +43,17 @@ public class HeapScan {
 	
 	public Tuple getNext(RID rid)
 	{
-		rid = ridIterator.next();
-		curPageId = rid.pageno;
-		Minibase.BufferManager.pinPage(curPageId, curPage, true);
-		return heapy.getRecord(rid);
+		if (hasNext())
+		{
+			rid = ridIterator.next();
+			curPageId = rid.pageno;
+			Minibase.BufferManager.pinPage(curPageId, curPage, true);
+			return heapy.getRecord(rid);
+		}
+		else
+		{
+			throws new IllegalStateException();
+		}
 	}
 }
 
