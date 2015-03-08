@@ -1,5 +1,6 @@
 package heap;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.TreeMap;
@@ -19,12 +20,12 @@ public class HeapFile {
 	
 	private String HFName;
 	private LinkedList<HFPage> HFPages;	
-	private TreeMap<DirectoryEntry, HFPage> HFPageDirectory;
+	private TreeMap<RID, HFPage> HFPageDirectory;
 
 	public HeapFile(String name) {
 		HFName = name;
 		HFPages = new LinkedList<HFPage>();
-		HFPageDirectory = new TreeMap<DirectoryEntry, HFPage>(new FreeSpaceComparator());
+		HFPageDirectory = new TreeMap<RID, HFPage>();
 	}
 
 	// must be done in O(log(n))
@@ -32,8 +33,9 @@ public class HeapFile {
 	{
 		HFPage insertPage = null;
 		RID rid = null;
+		Collections.sort(HFPages,new FreeSpaceComparator());
 		// if there are no pages, or if the page in the directory with the most free space hasn't enough free space, make a new page; otherwise, add data to page with most free space and re-sort
-		if (HFPages.isEmpty() || HFPageDirectory.firstEntry().getKey().freespace <= record.length)
+		if (HFPages.isEmpty() || HFPages.getFirst().getFreeSpace() <= record.length)
 		{
 			insertPage = new HFPage();
 			rid = insertPage.insertRecord(record);
@@ -42,36 +44,42 @@ public class HeapFile {
 		else
 		{
 			// find the first page in the directory that has enough space for the given record
-			insertPage = HFPageDirectory.firstEntry().getValue();
+			insertPage = HFPages.getFirst();
 			rid = insertPage.insertRecord(record);	
-			// remove and re-insert record in directory in order to update free space key comparison
-			HFPageDirectory.remove(HFPageDirectory.firstEntry().getKey());
 		}
 
-		HFPageDirectory.put(new DirectoryEntry(rid.pageno,insertPage.getFreeSpace()),insertPage);
+		HFPageDirectory.put(rid,insertPage);
 		return rid;
 	}
 	
 	public Tuple getRecord(RID rid)
 	{
-		return new Tuple();
+		byte[] record = HFPageDirectory.get(rid).selectRecord(rid);
+		return new Tuple(record,0,record.length);
 	}
 
 	// must be done in O(log(n))
 	public void updateRecord(RID rid, Tuple newRecord)
 	{
 		// don't assume that update will fit on current page
+		HFPage curPage = HFPageDirectory.get(rid);
+		Tuple curRecord = this.getRecord(rid);
+		if (newRecord.getLength() > curPage.getFreeSpace() + curRecord.getLength())
+		{
+			deleteRecord(rid);
+			insertRecord(newRecord.getTupleByteArray());
+		}
+		else
+		{
+			curPage.updateRecord(rid, newRecord);
+		}
 	}
 
 	// must be done in O(log(n))
 	public void deleteRecord(RID rid)
 	{
-		
-	}
-	
-	private HFPage findPage(RID rid)
-	{
-		
+		HFPage curPage = HFPageDirectory.get(rid);
+		curPage.deleteRecord(rid);
 	}
 	
 	public int getRecCnt()
@@ -95,22 +103,10 @@ public class HeapFile {
 	}
 }
 
-class DirectoryEntry
-{
-	public PageId pid;
-	public int freespace;
-	
-	DirectoryEntry(PageId pid, int fs)
-	{
-		this.pid = pid;
-		freespace = fs;
-	}
-}
-
-class FreeSpaceComparator implements Comparator<DirectoryEntry>
+class FreeSpaceComparator implements Comparator<HFPage>
 {
 	@Override
-	public int compare(DirectoryEntry first, DirectoryEntry second) {
-		return first.freespace - second.freespace;
+	public int compare(HFPage first, HFPage second) {
+		return first.getFreeSpace() - second.getFreeSpace();
 	}
 }
