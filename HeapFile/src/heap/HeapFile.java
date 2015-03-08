@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.TreeMap;
 
+import chainexception.ChainException;
 import diskmgr.DiskMgr;
 import global.Minibase;
 import global.PageId;
@@ -39,7 +40,7 @@ public class HeapFile {
 	}
 
 	// must be done in O(log(n))
-	public RID insertRecord(byte[] record)
+	public RID insertRecord(byte[] record) throws ChainException
 	{
 		HFPage insertPage = null;
 		RID rid = null;
@@ -69,7 +70,7 @@ public class HeapFile {
 	}
 
 	// must be done in O(log(n))
-	public boolean updateRecord(RID rid, Tuple newRecord)
+	public boolean updateRecord(RID rid, Tuple newRecord) throws ChainException
 	{
 		// don't assume that update will fit on current page
 		HFPage curPage = HFPageDirectory.get(rid);

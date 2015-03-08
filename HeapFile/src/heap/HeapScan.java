@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 
+import chainexception.ChainException;
 import global.Minibase;
 import global.PageId;
 import global.RID;
@@ -30,7 +31,7 @@ public class HeapScan {
 		close();
 	}
 
-	public void close()
+	public void close() throws ChainException
 	{
 		Minibase.BufferManager.unpinPage(curPageId, false);
 	}
