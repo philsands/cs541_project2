@@ -78,8 +78,3 @@ public class HeapFile {
 		return new HeapScan();
 	}
 }
-
-class Tuple
-{
-	Byte[] tuple;
-}
