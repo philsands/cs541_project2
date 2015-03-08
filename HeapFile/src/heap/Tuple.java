@@ -9,13 +9,12 @@ public class Tuple
 		tuple = new Byte[HFPage.PAGE_SIZE];
 	}
 	
-	public Tuple(byte[] data, boolean IDK, int length)
+	public Tuple(byte[] data, int start, int length)
 	{
 		tuple = new Byte[length];
-		int i = 0;
-		for (byte b : data)
+		for (int i = 0; i < length; i++)
 		{
-			tuple[i++] = new Byte(b);
+			tuple[i] = data[i + start];
 		}
 	}
 	
