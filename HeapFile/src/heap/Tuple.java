@@ -2,16 +2,16 @@ package heap;
 
 public class Tuple
 {
-	private Byte[] tuple;
+	private byte[] tuple;
 	
 	public Tuple()
 	{
-		tuple = new Byte[HFPage.PAGE_SIZE];
+		tuple = new byte[HFPage.PAGE_SIZE];
 	}
 	
 	public Tuple(byte[] data, int start, int length)
 	{
-		tuple = new Byte[length];
+		tuple = new byte[length];
 		for (int i = 0; i < length; i++)
 		{
 			tuple[i] = data[i + start];
@@ -23,7 +23,7 @@ public class Tuple
 		return tuple.length;
 	}
 	
-	public Byte[] getTupleByteArray()
+	public byte[] getTupleByteArray()
 	{
 		return tuple;
 	}
