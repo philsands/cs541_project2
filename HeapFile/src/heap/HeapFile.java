@@ -99,7 +99,12 @@ public class HeapFile {
 	
 	public HeapScan openScan()
 	{
-		return new HeapScan(new HeapFile("dummy"));
+		return new HeapScan(this);
+	}
+	
+	public TreeMap<RID,HFPage> getMap()
+	{
+		return HFPageDirectory;
 	}
 }
 
