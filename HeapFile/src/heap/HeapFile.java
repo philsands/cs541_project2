@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.TreeMap;
 
 import chainexception.ChainException;
+import bufmgr.BufMgr;
 import diskmgr.DiskMgr;
 import global.Minibase;
 import global.PageId;
@@ -22,17 +23,24 @@ import global.RID;
 public class HeapFile {
 	
 	private DiskMgr dm = Minibase.DiskManager;
+	private BufMgr bm = Minibase.BufferManager;
 	private String HFName;
+	protected PageId headerPageId;
 	private LinkedList<HFPage> HFPages;	
 	private TreeMap<RID, HFPage> HFPageDirectory;
 	private int recordCount;
 
-	public HeapFile(String name) {
+	public HeapFile(String name) 
+	{
 		HFName = name;
+	    HFPage headerPage = new HFPage();
+	    headerPageId = bm.newPage(headerPage, 1);
+	    headerPage.setCurPage(headerPageId);
+	    bm.unpinPage(headerPageId, true);
 		if (dm.get_file_entry(HFName) == null)
 		{
 			// allocate a header page to start
-			dm.add_file_entry(HFName, dm.allocate_page());
+			dm.add_file_entry(HFName, headerPageId);
 		}
 		HFPages = new LinkedList<HFPage>();
 		HFPageDirectory = new TreeMap<RID, HFPage>();
@@ -50,6 +58,7 @@ public class HeapFile {
 		{
 			insertPage = new HFPage();
 			rid = insertPage.insertRecord(record);
+			bm.pinPage(rid.pageno, insertPage, false);
 			HFPages.add(insertPage);
 		}
 		else
@@ -57,9 +66,11 @@ public class HeapFile {
 			// find the first page in the directory that has enough space for the given record
 			insertPage = HFPages.getFirst();
 			rid = insertPage.insertRecord(record);	
+			bm.pinPage(rid.pageno, insertPage, false);
 		}
 
 		HFPageDirectory.put(rid,insertPage);
+		bm.unpinPage(rid.pageno, true);
 		return rid;
 	}
 	
@@ -75,6 +86,7 @@ public class HeapFile {
 		// don't assume that update will fit on current page
 		HFPage curPage = HFPageDirectory.get(rid);
 		Tuple curRecord = this.getRecord(rid);
+	    bm.pinPage(rid.pageno, curPage, false);
 		if (newRecord.getLength() > curPage.getFreeSpace() + curRecord.getLength())
 		{
 			deleteRecord(rid);
@@ -82,17 +94,36 @@ public class HeapFile {
 		}
 		else
 		{
-			curPage.updateRecord(rid, newRecord);
+			try
+			{
+				curPage.updateRecord(rid, newRecord);
+				bm.unpinPage(rid.pageno, true);
+			}
+			catch (Exception e)
+			{
+				bm.unpinPage(rid.pageno, false);
+				throw new ChainException(null, "Couldn't update record");
+			}
 		}
 		
 		return true;
 	}
 
 	// must be done in O(log(n))
-	public boolean deleteRecord(RID rid)
+	public boolean deleteRecord(RID rid) throws ChainException
 	{
 		HFPage curPage = HFPageDirectory.get(rid);
-		curPage.deleteRecord(rid);
+		bm.pinPage(rid.pageno, curPage, false);
+	    try
+	    {
+	    	curPage.deleteRecord(rid);
+	        bm.unpinPage(rid.pageno, true);
+	    }
+	    catch(Exception e)
+	    {
+	       bm.unpinPage(rid.pageno, false);
+	       throw new ChainException(null, "Couldn't delete record");
+	    }
 		
 		return true;
 	}
@@ -100,14 +131,16 @@ public class HeapFile {
 	public int getRecCnt()
 	{
 		int count = 0;
-		RID currid = null;
+		RID currId = null;
 		for (HFPage hfp : HFPages)
 		{
-			currid = hfp.firstRecord();
-			while (hfp.hasNext(currid))
+			currId = hfp.firstRecord();
+			bm.pinPage(currId.pageno, hfp, false);
+			while (hfp.hasNext(currId))
 			{
 				count++;
 			}
+			bm.unpinPage(currId.pageno, false);
 		}
 		return count;
 	}
@@ -115,11 +148,6 @@ public class HeapFile {
 	public HeapScan openScan()
 	{
 		return new HeapScan(this);
-	}
-	
-	public TreeMap<RID,HFPage> getMap()
-	{
-		return HFPageDirectory;
 	}
 }
 
