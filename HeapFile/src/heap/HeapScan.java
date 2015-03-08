@@ -52,7 +52,7 @@ public class HeapScan {
 		}
 		else
 		{
-			throws new IllegalStateException();
+			throw new IllegalStateException();
 		}
 	}
 }
