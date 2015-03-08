@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 
+import global.Minibase;
 import global.PageId;
 import global.RID;
 
@@ -15,6 +16,7 @@ public class HeapScan {
 	private Iterator<RID> ridIterator;
 	RID currid;
 	PageId curPageId;
+	HFPage curPage;
 
 	protected HeapScan(HeapFile hf) {
 		heapy = hf;
@@ -25,12 +27,12 @@ public class HeapScan {
 	
 	protected void finalize() throws Throwable
 	{
-		
+		close();
 	}
 
 	public void close()
 	{
-		
+		Minibase.BufferManager.unpinPage(curPageId, false);
 	}
 	
 	public boolean hasNext()
@@ -41,7 +43,9 @@ public class HeapScan {
 	public Tuple getNext(RID rid)
 	{
 		rid = ridIterator.next();
-		//HFPage curPage = directory.get(rid);
+		curPageId = rid.pageno;
+		Minibase.BufferManager.pinPage(curPageId, curPage, true);
 		return heapy.getRecord(rid);
 	}
 }
+

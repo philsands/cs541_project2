@@ -5,6 +5,8 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.TreeMap;
 
+import diskmgr.DiskMgr;
+import global.Minibase;
 import global.PageId;
 import global.RID;
 
@@ -18,14 +20,22 @@ import global.RID;
 
 public class HeapFile {
 	
+	private DiskMgr dm = Minibase.DiskManager;
 	private String HFName;
 	private LinkedList<HFPage> HFPages;	
 	private TreeMap<RID, HFPage> HFPageDirectory;
+	private int recordCount;
 
 	public HeapFile(String name) {
 		HFName = name;
+		if (dm.get_file_entry(HFName) == null)
+		{
+			// allocate a header page to start
+			dm.add_file_entry(HFName, dm.allocate_page());
+		}
 		HFPages = new LinkedList<HFPage>();
 		HFPageDirectory = new TreeMap<RID, HFPage>();
+		recordCount = 0;
 	}
 
 	// must be done in O(log(n))
