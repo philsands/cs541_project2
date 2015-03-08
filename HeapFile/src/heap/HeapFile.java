@@ -75,6 +75,6 @@ public class HeapFile {
 	
 	public HeapScan openScan()
 	{
-		return new HeapScan();
+		return new HeapScan(new HeapFile("dummy"));
 	}
 }
