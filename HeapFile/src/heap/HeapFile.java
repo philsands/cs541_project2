@@ -59,7 +59,7 @@ public class HeapFile {
 	}
 
 	// must be done in O(log(n))
-	public void updateRecord(RID rid, Tuple newRecord)
+	public boolean updateRecord(RID rid, Tuple newRecord)
 	{
 		// don't assume that update will fit on current page
 		HFPage curPage = HFPageDirectory.get(rid);
@@ -73,13 +73,17 @@ public class HeapFile {
 		{
 			curPage.updateRecord(rid, newRecord);
 		}
+		
+		return true;
 	}
 
 	// must be done in O(log(n))
-	public void deleteRecord(RID rid)
+	public boolean deleteRecord(RID rid)
 	{
 		HFPage curPage = HFPageDirectory.get(rid);
 		curPage.deleteRecord(rid);
+		
+		return true;
 	}
 	
 	public int getRecCnt()
