@@ -56,6 +56,7 @@ public class HeapFile {
 		{
 			insertPage = new HFPage();
 			rid = insertPage.insertRecord(record);
+			System.out.println(insertPage + "\n" + rid);
 			bm.pinPage(rid.pageno, insertPage, false);
 			HFPages.add(insertPage);
 		}
