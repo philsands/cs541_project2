@@ -1,29 +1,29 @@
 package heap;
 
-import java.util.Iterator;
-import java.util.NavigableSet;
-import java.util.TreeMap;
-
+import bufmgr.BufMgr;
 import chainexception.ChainException;
+import diskmgr.DiskMgr;
 import global.Minibase;
 import global.PageId;
 import global.RID;
 
 public class HeapScan {
 	
-	private HeapFile heapy;
-	private TreeMap<RID,HFPage> directory;
-	private NavigableSet<RID> ridSet;
-	private Iterator<RID> ridIterator;
-	RID currid;
-	PageId curPageId;
-	HFPage curPage;
+	private DiskMgr dm = Minibase.DiskManager;
+	private BufMgr bm = Minibase.BufferManager;
+	private RID currid;
+	private PageId curPageId;
+	private HFPage curPage, headerPage;
+	private int totalRecords, i;
 
-	protected HeapScan(HeapFile hf) {
-		heapy = hf;
-		directory = heapy.getMap();
-		ridSet = directory.navigableKeySet();
-		ridIterator = ridSet.iterator();
+	protected HeapScan(HeapFile hf) 
+	{
+		headerPage = new HFPage();
+		bm.pinPage(hf.headerPageId, headerPage, true);
+		totalRecords = hf.getRecCnt();
+		i = 0;
+		curPage = null;
+	    currid = null;
 	}
 	
 	protected void finalize() throws Throwable
@@ -33,27 +33,58 @@ public class HeapScan {
 
 	public void close() throws ChainException
 	{
-		Minibase.BufferManager.unpinPage(curPageId, false);
+		bm.unpinPage(headerPage.getCurPage(), false);
+		bm.unpinPage(curPageId, false);
+		headerPage = null;
+		curPage = null;
+		currid = null;
 	}
 	
 	public boolean hasNext()
 	{
-		return ridIterator.hasNext();
+		if(i < totalRecords && curPage.nextRecord(currid) != null)
+	         return true;
+		return false;
 	}
 	
 	public Tuple getNext(RID rid)
 	{
-		if (hasNext())
+		// make sure there are more records to check
+		if(i < this.totalRecords)
 		{
-			rid = ridIterator.next();
-			curPageId = rid.pageno;
-			Minibase.BufferManager.pinPage(curPageId, curPage, true);
-			return heapy.getRecord(rid);
+			// check to see whether or not first page has been accessed
+			if (currid == null)
+			{
+				curPage = new HFPage();
+				bm.pinPage(headerPage.getCurPage(), curPage, false);
+				currid = curPage.firstRecord();
+				rid = currid;
+				i++;     
+	        }
+			else
+			{
+				currid = curPage.nextRecord(currid);
+				if (currid == null)
+				{
+					// this is the case where we have exhausted all records on one page
+					PageId getNextId = headerPage.getNextPage();
+					if (getNextId != null)
+					{
+						bm.unpinPage(headerPage.getCurPage(), false);
+						bm.pinPage(getNextId, headerPage, false);
+						currid = null;
+						return getNext(rid);
+					}
+				}
+				
+		    }
 		}
 		else
-		{
-			throw new IllegalStateException();
-		}
+		{ 
+			throw new IllegalStateException("Read all records");
+		}	
+		
+		byte[] record = curPage.selectRecord(rid);
+		return new Tuple(record,0,record.length);
 	}
 }
-
