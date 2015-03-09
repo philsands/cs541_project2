@@ -55,7 +55,10 @@ public class HeapFile {
 		if (HFPages.isEmpty() || HFPages.getFirst().getFreeSpace() <= record.length)
 		{
 			insertPage = new HFPage();
+			PageId newPid = dm.allocate_page();
+			dm.read_page(newPid, insertPage);
 			rid = insertPage.insertRecord(record);
+			dm.write_page(newPid, insertPage);
 			//System.out.println(insertPage + "\n" + rid);
 			bm.pinPage(rid.pageno, insertPage, false);
 			HFPages.add(insertPage);
@@ -64,7 +67,9 @@ public class HeapFile {
 		{
 			// find the first page in the directory that has enough space for the given record
 			insertPage = HFPages.getFirst();
-			rid = insertPage.insertRecord(record);	
+			dm.read_page(insertPage.getCurPage(), insertPage);
+			rid = insertPage.insertRecord(record);
+			dm.write_page(insertPage.getCurPage(), insertPage);
 			bm.pinPage(rid.pageno, insertPage, false);
 		}
 
@@ -96,6 +101,7 @@ public class HeapFile {
 			try
 			{
 				curPage.updateRecord(rid, newRecord);
+				dm.write_page(rid.pageno,curPage);
 				bm.unpinPage(rid.pageno, true);
 			}
 			catch (Exception e)
@@ -116,6 +122,7 @@ public class HeapFile {
 	    try
 	    {
 	    	curPage.deleteRecord(rid);
+	    	dm.write_page(rid.pageno,curPage);
 	        bm.unpinPage(rid.pageno, true);
 	    }
 	    catch(Exception e)
