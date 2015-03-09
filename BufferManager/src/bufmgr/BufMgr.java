@@ -571,3 +571,119 @@ class Descriptor {
 
 }
 
+<<<<<<< HEAD
+=======
+class HashTable implements GlobalConst{
+	private LinkedList<PageFramePair> directory[];
+	private int tableSize;
+	public static final int A = 42;		// these numbers have no real significance and were chosen for a consistent hash
+	public static final int B = 13298;
+
+	public HashTable(int ts)
+	{
+		System.out.println("HashTable");
+		directory = new LinkedList[ts];
+		for(int i=0;i<ts;i++){
+			directory[i]=new LinkedList<PageFramePair>();
+		}
+		tableSize = ts;
+	}
+
+	public int hashFunction(PageId key) {
+		return (A*key.pid + B) % tableSize;
+	}
+
+	public boolean insert(PageId pn, int fn)
+	{
+		System.out.println("Hash insert");
+		if(pn.pid==INVALID_PAGEID) return false;
+		int bucketNumber = hashFunction(pn);
+		System.out.println();
+		System.out.println(bucketNumber);
+		if (!hasPage(bucketNumber, pn))
+		{
+			directory[bucketNumber].addLast(new PageFramePair(pn,fn));
+			
+			return true;
+		}
+
+		return false;
+	}
+
+	public PageFramePair search(PageId pn)
+	{
+		System.out.println("Hash search");
+		int bn = hashFunction(pn);
+		for (int i = 0; i < directory[bn].size(); i++)
+		{
+			if ((directory[bn].get(i)).getPageNum() == pn) 
+			{
+				return directory[bn].get(i);
+			}
+		}
+		return null;
+	}
+
+	public boolean remove(PageId pn)
+	{
+		System.out.println("Hash remove");
+		int bucketNumber = hashFunction(pn);
+		if(pn.pid==INVALID_PAGEID) return true;
+		for (int i = 0; i < directory[bucketNumber].size(); i++)
+		{
+			if ((directory[bucketNumber].get(i)).getPageNum() == pn) 
+			{
+				directory[bucketNumber].remove(i);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean hasPage(PageId pn){//hasPage with hashFunction
+		System.out.println("Hash haspage1");
+		if(pn.pid==INVALID_PAGEID) return false;
+		int bn = hashFunction(pn);
+		if (directory[bn] == null) return false;
+		for (int i = 0; i < directory[bn].size(); i++)
+		{
+			if ((directory[bn].get(i)).getPageNum() == pn) 
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public boolean hasPage(int bn, PageId pn)
+	{
+		if(pn.pid==INVALID_PAGEID) return false;
+		System.out.println("Hash haspage2");
+		if (directory[bn] == null) return false;
+		for (int i = 0; i < directory[bn].size(); i++)
+		{
+			if ((directory[bn].get(i)).getPageNum() == pn) 
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
+class PageFramePair {
+	private PageId pageNum;
+	private int frameNum;
+
+	public PageFramePair(PageId pn, int fn)
+	{
+		pageNum = pn;
+		frameNum = fn;
+	}
+
+	public PageId getPageNum() {return pageNum;}
+	public int getFrameNum() {return frameNum;}
+}
+>>>>>>> a22d52636b3d412aceca55ab1505ddd6661d82ca
