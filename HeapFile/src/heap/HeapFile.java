@@ -58,7 +58,7 @@ public class HeapFile {
 			PageId newPid = dm.allocate_page();
 			dm.read_page(newPid, insertPage);
 			rid = insertPage.insertRecord(record);
-			dm.write_page(newPid, insertPage);
+			//dm.write_page(newPid, insertPage);
 			System.out.println(insertPage + "\n" + rid);
 			bm.pinPage(rid.pageno, insertPage, false);
 			HFPages.add(insertPage);
