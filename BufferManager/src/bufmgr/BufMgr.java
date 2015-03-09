@@ -12,20 +12,25 @@ import global.*;
 
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.Map.Entry;
+import java.util.Random;
 
 import chainexception.ChainException;
+import java.util.Queue;
 
 public class BufMgr implements GlobalConst{
 
-	private Page bufPool[];			// array to manage buffer pool
-	private Descriptor bufDescr[];	// array of information regarding what is in the buffer pool
-	private HashTable pageFrameDirectory;
+	public Page bufPool[];			// array to manage buffer pool
+	private Descriptor[] bufDescr;	// array of information regarding what is in the buffer pool
+	private HashTable<Integer,Integer> pageFrameDirectory;
 	private String replacementPolicy;
 	private ArrayList<PageId> recency;
 	private int numbufs;
-	
+	private Queue<Integer> queue;
+
 
 	/**
 	 * Create the BufMgr object.
@@ -38,19 +43,47 @@ public class BufMgr implements GlobalConst{
 	 */
 	public BufMgr(int numbufs, int lookAheadSize, String replacementPolicy) {
 		// initialize all buffer pool components
+		this.numbufs=numbufs;
 		bufPool = new Page[numbufs];
 		recency = new ArrayList<PageId>();
 		bufDescr = new Descriptor[numbufs];
 		for(int i=0;i<numbufs;i++){
-			PageId pageid=new PageId();
+			
+			PageId pageid=new PageId(INVALID_PAGEID);
 			pageid.pid=INVALID_PAGEID;
-			bufDescr[i]=new Descriptor(pageid,0,false);
+			bufPool[i]=new Page();
+			bufDescr[i]=new Descriptor(pageid,0,false,false);
 		}
-		pageFrameDirectory = new HashTable(20);	// 20 is arbitrarily chosen prime number for now
+		
+		pageFrameDirectory = new HashTable<Integer,Integer>();	// 20 is arbitrarily chosen prime number for now
 		this.numbufs = numbufs;
 		// ignore lookAheadSize
 		this.replacementPolicy = replacementPolicy;
+		queue = new LinkedList<Integer>();
+        initializeQueue();
+
 	}
+	public void initializeQueue() {
+        for (int i = 0; i < numbufs; i++)
+                queue.add(i);
+	}
+	/*
+     * Return the first empty frame if the buffer is full throw an exception
+     */
+    public int getFirstEmptyFrame() throws BufferPoolExceededException {
+            if (queue.size() == 0)
+                    throw new BufferPoolExceededException(null, "BUFFER_POOL_EXCEED");
+            else
+                    return queue.poll();
+    }
+
+    /*
+     * Check whether the buffer is full or not !
+     */
+    public boolean isFull() {
+            return (queue.size() == 0);
+    }
+
 
 	/**
 	 * Pin a page.
@@ -72,105 +105,103 @@ public class BufMgr implements GlobalConst{
 	 * @throws BufferPoolExceededException 
 	 * @throws InvalidPageNumberException 
 	 * @throws HashEntryNotFoundException 
+	 * @throws IOException 
+	 * @throws FileIOException 
+	 * @throws PagePinnedException 
+	 * @throws DiskMgrException 
 	 */
-	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException, InvalidPageNumberException, HashEntryNotFoundException {
+	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException, InvalidPageNumberException, HashEntryNotFoundException, PagePinnedException, FileIOException, IOException, DiskMgrException {
 		// search buffer pool for existence of page using hash
-
+		System.out.println("unpinPage:  "+getNumUnpinned());
 		//if(emptyPage==true) return;
 		PageId writablePageID=new PageId(INVALID_PAGEID);
 		boolean writable=false;
-		System.out.println("Pin Page");
-
-		if(pageFrameDirectory.hasPage(pageno))
+		System.out.println("PID:  "+pageno.pid);
+		int index=-1;
+		if(pageFrameDirectory.contain(pageno.pid))
 		{
-			System.out.println("HashTab Has this page");
-			PageFramePair pagepair= pageFrameDirectory.search(pageno);
+			
+			//System.out.println("HashTab Has this page");
+			int FrameNum= pageFrameDirectory.get(pageno.pid);
 			// if found, increment pin count for page and return pointer to page
-			if(pagepair!=null){
-				bufDescr[pagepair.getFrameNum()].incrementPinCount();
-				page=bufPool[pagepair.getFrameNum()];
-				recency.add(pagepair.getPageNum());
+				System.out.println("Frame in Pinpage:"+ FrameNum+"PID:"+pageno.pid);
+				//System.out.println("HashTab Has this page, page pair is not null");
+				if(bufDescr[FrameNum].getPinCount()==0){
+					System.out.println("QUEUE REMOVE");
+					queue.remove(FrameNum);
+				}
+				bufDescr[FrameNum].incrementPinCount();
+				page.setpage(bufPool[FrameNum].getpage());
 				return;
-			}
+			
 		}
 		
 		// find the new frame for new page
-		int newframe=-1;
-		for (int i = 0; i < numbufs; i++)
-		{
-			if (bufPool[i] == null)
-			{
-				newframe = i;
-				break;
-			}
-		}
-				
-		// no free frame
-		if(newframe==-1){
-			newframe=getLIRSCandidate();
-		}
 		
-			
+		
 			// if not, choose frame from set of replacement candidates, read page using diskmgr, and pin it
 			// call LIRS function to determine which frame to swap out
 			// if dirty, write out before flushing from buffer
-		
-		System.out.println(newframe);
-		
-			if(bufDescr[newframe].getDirtyBit()&&bufDescr[newframe].getPageNumber().pid!=INVALID_PAGEID) 
+		else if(queue.size()>0){
+			// choose a frame (from the
+            // set of replacement candidates) to hold this page
+			Page pg=new Page();
+			index = getFirstEmptyFrame();
+			System.out.println("INDEX IS:" + index);
+            // Also, must write out the old page in chosen frame if it is
+            // dirty before reading new page.
+			if (bufDescr[index].pageNumber.pid!=INVALID_PAGEID&&bufDescr[index].getDirtyBit()) {
+                flushPage(bufDescr[index].getPageNumber());
+                System.out.println("DIRTY !!!");
+                //Minibase.DiskManager.write_page(pageno,bufPool[index]);
+                pageFrameDirectory.remove(bufDescr[index].getPageNumber().pid);
+                
+			}
+			
+            try { Minibase.DiskManager.read_page(pageno,pg); } // read the page	
+            catch (InvalidPageNumberException | FileIOException | IOException e)
+            { e.printStackTrace();}
+			
+            page.setpage(pg.getpage());
+            page.setPage(bufPool[index]);
+            //bufPool[index] = page; // add to pool
+            //has to deal with dirtybit
+			int pinc=bufDescr[index].getPinCount();
+            bufDescr[index] = new Descriptor(new PageId(pageno.pid),pinc+1,false,false); // add to descirptor
+            pageFrameDirectory.put(pageno.pid,index); // add to hashtable
+			
+		}
+		else{
+			
+			int frameNumber=getLIRSCandidate();
+			System.out.println("!!!!!!!!!!!!!!!!!!!!!!!"+frameNumber);
+			// get a candidate frame and remove it from the policy
+			
+			if(frameNumber != -1) // there are replacement candidates
 			{
-				writable=true;
-				writablePageID.pid=bufDescr[newframe].getPageNumber().pid;
-				
-			}
-			
-			if(!pageFrameDirectory.remove(bufDescr[newframe].getPageNumber())){
-				throw new InvalidPageNumberException(null,"Cannot remove Invalid Num");
-			}
-			bufDescr[newframe].setPageNumber(pageno);
-			bufDescr[newframe].setDirtyBit(false);
-			
-			if(!pageFrameDirectory.insert(pageno, newframe)){
-				throw new HashEntryNotFoundException(null,"Cannot insert Invalid Num");
-			}
-			bufDescr[newframe].incrementPinCount();
-			Page writablePage;
-			if(bufPool[newframe]!=null){
-				writablePage=new Page(bufPool[newframe].getData());
-			}else{
-				writablePage=new Page();
-			} 
-
-			if(writable){
-				try{
-				Minibase.DiskManager.write_page(writablePageID, writablePage);
-				}
-				catch(Exception e){
-					System.out.println("Write page exception");
-				}
-			}
-			
-			if(emptyPage==false){
-				try{
-					writablePage.setpage(bufPool[newframe].getData());
-					Minibase.DiskManager.read_page(pageno, writablePage);				
-					}catch(Exception e){
-						System.out.println("Page Not Read");
-					}
-			}
-			page.setpage(writablePage.getData());
-			
-			
-			
+			// flush page
+			if(bufDescr[frameNumber].getDirtyBit()) flushPage(bufDescr[frameNumber].getPageNumber());
+			// remove old page from the hash map
+			pageFrameDirectory.remove(bufDescr[frameNumber].getPageNumber().pid);
+			Page pg = new Page();
 			recency.add(pageno);
-			
-
-
-			// throw bufferPoolExceededException
-			
-			if(getNumUnpinned()==0){
-				throw new BufferPoolExceededException(null,"bufferPoolExceededException");
+			try { Minibase.DiskManager.read_page(pageno,pg); } // read the page
+			catch (InvalidPageNumberException | FileIOException | IOException e)
+			{ e.printStackTrace();}
+				page.setpage(pg.getpage());
+				page.setPage(bufPool[index]);
+				//bufPool[frameNumber] = page; // add to pool
+				bufDescr[frameNumber]=new Descriptor(new PageId(pageno.pid),1,false,false); // update to descirptor
+				pageFrameDirectory.put(pageno.pid,frameNumber); // add to hashtable
 			}
+			else // 
+			{
+				System.out.println("Memory FUll...");
+				throw new BufferPoolExceededException(new Exception(),"bufmgr.BufferPoolExceededException");
+			}
+		}
+
+		
 		
 	}
 
@@ -254,17 +285,18 @@ public class BufMgr implements GlobalConst{
 	 * @exception PageUnpinnedException
 	 */
 	public void unpinPage(PageId pageno, boolean dirty) throws PageUnpinnedException, HashEntryNotFoundException,InvalidPageNumberException {
-		if(dirty!=true) return;
-		System.out.println("unpinPage");
-		if(pageFrameDirectory.hasPage(pageno))
+		
+		
+		
+		if(pageFrameDirectory.contain(pageno.pid))
 		{
-			System.out.println("unpinPage-haspage");
-			PageFramePair pagepair= pageFrameDirectory.search(pageno);
-			if(pagepair.getPageNum().pid==INVALID_PAGEID){
-				throw new InvalidPageNumberException(null,"Invalid Page Number");
-			}
 			
-			int pintemp=bufDescr[pagepair.getFrameNum()].getPinCount();
+			int FrameNum= pageFrameDirectory.get(pageno.pid);
+			
+			//System.out.println("unpinPage-haspage");
+			
+			
+			int pintemp=bufDescr[FrameNum].getPinCount();
 			if(pintemp==0)
 			{
 				//throw exception;
@@ -272,17 +304,26 @@ public class BufMgr implements GlobalConst{
 			}
 			else if(pintemp>0)
 			{
-				bufDescr[pagepair.getFrameNum()].decrementPinCount();
+				bufDescr[FrameNum].setDirtyBit(dirty);
+				bufDescr[FrameNum].decrementPinCount();
 				
+				if (bufDescr[FrameNum].getPinCount() == 0){
+					System.out.println("QUEUE ADD!");
+                    queue.add(FrameNum);
+				}
 			}
-			bufDescr[pagepair.getFrameNum()].setDirtyBit(false);
+			
+			
 		}
 		else
 		{
 			//throw exception
 			throw new HashEntryNotFoundException(null,"HashEntryNotFoundException");
+			
 		}
+		
 	}
+
 
 	/**
 	 * Allocate new pages.* Call DB object to allocate a run of new pages and
@@ -296,96 +337,43 @@ public class BufMgr implements GlobalConst{
 	 * @param howmany total number of allocated new pages.
 	 *
 	 * @return the first page id of the new pages.__ null, if error.
+	 * @throws ChainException 
+	 * @throws IOException 
 	 */
-	public PageId newPage(Page firstpage, int howmany) 
+	public PageId newPage(Page firstpage, int howmany) throws IOException, ChainException 
 	{
 		// allocate new pages
-		PageId pgid = null;
+		
 		System.out.println("newPage");
-		try
-		{
-			pgid=Minibase.DiskManager.allocate_page(howmany);
-		} 
-		catch(ChainException | IOException e)
-		{
-			System.out.print("Allocate error");
-		}
-
-		
-		//if no more space 
-		int newframe=-1;
-		int bufcount=0;
-		for (int i = 0; i < numbufs; i++)
-		{
-			if (bufPool[i] == null)
-			{
-				bufcount++;
-			}
-		}
-		if(bufcount<howmany){
-			//may need exception
-			try{
-				Minibase.DiskManager.deallocate_page(pgid, howmany);
-				return null;	
-			}catch(ChainException|IOException e){
-				System.out.print("Read_Page error");
-			}
-		}
-		
-		
-		
-		
-		// find the new frame for new page
-
-		try
-		{
-			Minibase.DiskManager.read_page(pgid,firstpage);
-		} 
-		catch(ChainException | IOException e)
-		{
-			System.out.print("Read_Page error");
-		}
-
-		
-		// find the new frame for new page
-		newframe=-1;
-		for (int i = 0; i < numbufs; i++)
-		{
-			if (bufPool[i] == null)
-			{
-				newframe = i;
-				break;
-			}
-		}
-		
-		// no free frame
-		if (newframe==-1)
-		{
-			//buffer is full, deallocate new pages
+		if(getNumUnpinned()!=0){
+			final PageId pgid=new PageId();
+			//if(isFull()) return null;
 			try
 			{
-				Minibase.DiskManager.deallocate_page(pgid, howmany);
+				Minibase.DiskManager.allocate_page(pgid,howmany);
 			} 
 			catch(ChainException | IOException e)
 			{
-				System.out.print("Deallocate error");
+				System.out.println(e);
+				e.printStackTrace();
 			}
+		
+			try
+			{
+				this.pinPage(pgid, firstpage, false);
+			}
+			catch (Exception e)
+			{
+				Minibase.DiskManager.deallocate_page(pgid, howmany);
+				System.out.println("Pinpage In NewPage");
+				return null;
+			}
+			return pgid;
+			
+		}else{
+			System.out.println("Buffer FULL");
 			return null;
 		}
-		
-		bufPool[newframe] = firstpage;
-		bufDescr[newframe] = new Descriptor(pgid,0,false);
-		pageFrameDirectory.insert(pgid, newframe);
-		recency.add(pgid);
-		try
-		{
-			this.pinPage(pgid, bufPool[newframe], false);
-		}
-		catch (Exception e)
-		{
-			System.out.println(e);
-		}
-		return pgid;
 	}
 
 	/**
@@ -394,24 +382,62 @@ public class BufMgr implements GlobalConst{
 	 * deallocate the page.
 	 *
 	 * @param globalPageId the page number in the data base.
-	 * @throws PagePinnedException 
+	 * @throws ChainException 
 	 */
-	public void freePage(PageId globalPageId) throws PagePinnedException {
-		System.out.println("freePage");
-		PageFramePair pagepair= pageFrameDirectory.search(globalPageId);
-		try
-		{
+	public void freePage(PageId globalPageId) throws ChainException {
+		//System.out.println("freePage");
+		if(globalPageId.pid<0) return;
+		if(pageFrameDirectory.contain(globalPageId.pid)){
+			try{
+			int framenum= pageFrameDirectory.get(globalPageId.pid);
+			
+			
+			//System.out.println("FREEPAGE FRAME:");
+			//System.out.println(globalPageId.pid);
+			
+			if(framenum>=numbufs){
+				throw new InvalidRunSizeException(null,"Too large page");
+			}
+			if(framenum<0){
+				Minibase.DiskManager.deallocate_page(globalPageId);
+				return;
+			}
+			
+				if(bufDescr[framenum].getPinCount()<=1){
+					
+					if (bufDescr[framenum].getPinCount() != 0)
+			            unpinPage(globalPageId,false);
+					bufDescr[framenum].setDirtyBit(false);
+					
+					pageFrameDirectory.remove(globalPageId.pid);
+						
+					removeAllPageReferences(globalPageId);
+					
+					//flushPage(globalPageId);
+					
+					Minibase.DiskManager.deallocate_page(globalPageId);
+			
+				}
+				else
+				{
+				System.out.println("Page is used by another user.");
+				throw new PagePinnedException(new Exception(),"bufmgr.PagePinnedException");
+				}
+			}catch (Exception e) {
+                throw new PagePinnedException(null, "BUFMGR:FAIL_PAGE_FREE");
+			}
+
+		
+		}else{
+		//bufPool[pagepair.getFrameNum()] = null;
+			try{
 			Minibase.DiskManager.deallocate_page(globalPageId);
+			}catch(Exception e){
+				e.printStackTrace();
+			}
 		}
-		catch(ChainException e)
-		{
-			// not sure this is right, but we are expected to throw a Page Pinned Exception
-			throw new PagePinnedException(e,"BUFMGR: Page Pinned");
-		}
-		pageFrameDirectory.remove(pagepair.getPageNum());
-		removeAllPageReferences(pagepair.getPageNum());
-		bufDescr[pagepair.getFrameNum()] = null;
-		bufPool[pagepair.getFrameNum()] = null;
+
+		
 	}
 
 	/**
@@ -421,36 +447,51 @@ public class BufMgr implements GlobalConst{
 	 * @param pageid the page number in the database.
 	 * @throws IOException 
 	 * @throws FileIOException 
+	 * @throws HashEntryNotFoundException 
+	 * @throws PagePinnedException 
+	 * @throws DiskMgrException 
 	 */
 
-	public void flushPage(PageId pageid) throws InvalidPageNumberException, FileIOException, IOException{
-		System.out.println("flushPage");
-		PageFramePair pagepair= pageFrameDirectory.search(pageid);
-		if(pagepair.getFrameNum()==INVALID_PAGEID){
-			throw new InvalidPageNumberException(null,"Invalid pageNumber");
-		}
-		if(bufDescr[pagepair.getFrameNum()].getPageNumber().pid==INVALID_PAGEID){
-			throw new InvalidPageNumberException(null,"Invalid pageNumber");
-		}
+	public void flushPage(PageId pageid) throws PagePinnedException,InvalidPageNumberException, FileIOException, IOException, HashEntryNotFoundException, PagePinnedException, DiskMgrException{
+		//System.out.println("flushPage");
+		int FrameNum= pageFrameDirectory.get(pageid.pid);
 		
-		if (bufDescr[pagepair.getFrameNum()].getDirtyBit())
-		{
-			final PageId targetPageId = new PageId(bufDescr[pagepair.getFrameNum()].getPageNumber().pid);	
-			Minibase.DiskManager.write_page(targetPageId, bufPool[pagepair.getFrameNum()]);
-				
-				
-			pageFrameDirectory.remove(pagepair.getPageNum());
-			removeAllPageReferences(pagepair.getPageNum());
-			bufDescr[pagepair.getFrameNum()] = null;
-			bufPool[pagepair.getFrameNum()] = null;
+		if(FrameNum==INVALID_PAGEID){
+			throw new InvalidPageNumberException(null,"Invalid pageNumber");
 		}
+		Page apage=null;
+		if(bufPool[FrameNum]!=null)
+			apage=new Page(bufPool[FrameNum].getpage().clone());
+			if(bufDescr[FrameNum].getPageNumber().pid==INVALID_PAGEID){
+				throw new InvalidPageNumberException(null,"Invalid pageNumber");
+			}
+			try{
+			if(apage!=null){
+			Minibase.DiskManager.write_page(pageid,apage);
+			bufDescr[FrameNum].setDirtyBit(false);
+			}
+			else{
+				throw new HashEntryNotFoundException(null,
+                        "BUF_MNGR: PAGE NOT FLUSHED ID EXCEPTION!");
+			}
+			}catch(Exception e){
+				throw new DiskMgrException(e, "DB.java: flushPage() failed");
+			}
+			
+			
+			
+		
+		
 	}
 
 	/**
 	 * Used to flush all dirty pages in the buffer pool to disk
+	 * @throws PagePinnedException 
+	 * @throws HashEntryNotFoundException 
+	 * @throws DiskMgrException 
 	 *
 	 */
-	public void flushAllPages() {
+	public void flushAllPages() throws HashEntryNotFoundException, PagePinnedException, DiskMgrException {
 		for(int i=0;i<numbufs;i++){
 			if(bufDescr[i].getDirtyBit()==true)
 				try{
@@ -481,27 +522,21 @@ public class BufMgr implements GlobalConst{
 	 * Returns the total number of unpinned buffer frames.
 	 */
 	public int getNumUnpinned() {
-		int unpinned = 0;
-		for (Descriptor d : bufDescr)
-		{
-			if (d.getPinCount() == 0)
-				unpinned++;
-		}
-
-		return unpinned;
+		return queue.size();
 	}
 
 };
 
 class Descriptor {
-	private PageId pageNumber;
+	public PageId pageNumber;
 	private int pinCount;
-	private boolean dirtyBit;
-
-	public Descriptor(PageId pn, int pc, boolean db) {
+	public boolean dirtyBit;
+	public boolean isInsert;
+	public Descriptor(PageId pn, int pc, boolean db,boolean ii) {
 		pageNumber = pn;
 		pinCount = pc;
 		dirtyBit = db;
+		isInsert=ii;
 	}
 
 	// getters
@@ -516,7 +551,11 @@ class Descriptor {
 		return pinCount;
 	}
 	public void setPageNumber(PageId id){
+	
 		this.pageNumber=id;
+	}
+	public void setPageNumberId(int id){
+		this.pageNumber.pid=id;
 	}
 	public int decrementPinCount()
 	{
@@ -532,210 +571,3 @@ class Descriptor {
 
 }
 
-class HashTable implements GlobalConst{
-	private LinkedList<PageFramePair> directory[];
-	private int tableSize;
-	public static final int A = 42;		// these numbers have no real significance and were chosen for a consistent hash
-	public static final int B = 13298;
-
-	public HashTable(int ts)
-	{
-		System.out.println("HashTable");
-		directory = new LinkedList[ts];
-		for(int i=0;i<ts;i++){
-			directory[i]=new LinkedList<PageFramePair>();
-		}
-		tableSize = ts;
-	}
-
-	public int hashFunction(PageId key) {
-		return (A*key.pid + B) % tableSize;
-	}
-
-	public boolean insert(PageId pn, int fn)
-	{
-		System.out.println("Hash insert");
-		if(pn.pid==INVALID_PAGEID) return false;
-		int bucketNumber = hashFunction(pn);
-		System.out.println();
-		System.out.println(bucketNumber);
-		if (!hasPage(bucketNumber, pn))
-		{
-			directory[bucketNumber].addLast(new PageFramePair(pn,fn));
-			
-			return true;
-		}
-
-		return false;
-	}
-
-	public PageFramePair search(PageId pn)
-	{
-		System.out.println("Hash search");
-		int bn = hashFunction(pn);
-		for (int i = 0; i < directory[bn].size(); i++)
-		{
-			if ((directory[bn].get(i)).getPageNum() == pn) 
-			{
-				return directory[bn].get(i);
-			}
-		}
-		return null;
-	}
-
-	public boolean remove(PageId pn)
-	{
-		System.out.println("Hash remove");
-		int bucketNumber = hashFunction(pn);
-		if(pn.pid==INVALID_PAGEID) return true;
-		for (int i = 0; i < directory[bucketNumber].size(); i++)
-		{
-			if ((directory[bucketNumber].get(i)).getPageNum() == pn) 
-			{
-				directory[bucketNumber].remove(i);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	public boolean hasPage(PageId pn){//hasPage with hashFunction
-		System.out.println("Hash haspage1");
-		if(pn.pid==INVALID_PAGEID) return false;
-		int bn = hashFunction(pn);
-		if (directory[bn] == null) return false;
-		for (int i = 0; i < directory[bn].size(); i++)
-		{
-			if ((directory[bn].get(i)).getPageNum() == pn) 
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	public boolean hasPage(int bn, PageId pn)
-	{
-		if(pn.pid==INVALID_PAGEID) return false;
-		System.out.println("Hash haspage2");
-		if (directory[bn] == null) return false;
-		for (int i = 0; i < directory[bn].size(); i++)
-		{
-			if ((directory[bn].get(i)).getPageNum() == pn) 
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-}
-
-class PageFramePair {
-	private PageId pageNum;
-	private int frameNum;
-
-	public PageFramePair(PageId pn, int fn)
-	{
-		pageNum = pn;
-		frameNum = fn;
-	}
-
-	public PageId getPageNum() {return pageNum;}
-	public int getFrameNum() {return frameNum;}
-}
-
-/*
-class LRUCache{
-
-    int size;
-    int capacity;
-
-    DoubleLinkedList head;
-    DoubleLinkedList tail;
-    HashMap<Integer, DoubleLinkedList> map;
-
-    public LRUCache(int capacity) {
-        this.size = 0;
-        this.capacity = capacity;
-        head = null;
-        tail = null;
-        map = new HashMap<Integer, DoubleLinkedList>();
-    }
-
-    public void remove(DoubleLinkedList node) {
-        if (node == head && node == tail) {
-            head = null;
-            tail = null;
-        } else if (node == head) {
-            head.next.prev = null;
-            head = head.next;
-        } else if (node == tail) {
-            tail.prev.next = null;
-            tail = tail.prev;
-        } else {
-            node.prev.next = node.next;
-            node.next.prev = node.prev;
-        }
-        node.prev = null;
-        node.next = null;
-    }
-
-    public void setHead(DoubleLinkedList node) {
-        node.next = head;
-        node.prev = null;
-        if (head != null) {
-            head.prev = node;
-        }
-
-        head = node;
-        if (tail == null) {
-            tail = node;
-        }
-    }
-
-    public int get(int key) {
-        if (!map.containsKey(key)) {
-            // if key is not found
-            return -1;
-        } else {
-            // if key is found
-            DoubleLinkedList target = map.get(key);
-            remove(target);
-            setHead(target);
-            return head.val;
-        }
-    }
-
-    public void set(int key, int value) {
-        if (this.get(key) != -1) {
-            // key exist before, just replace the old value
-            DoubleLinkedList old = map.get(key);
-            old.val = value;
-        } else {
-            // this is a new key-value pair, insert it
-            DoubleLinkedList newHead = new DoubleLinkedList(key, value);
-            map.put(key, newHead);
-            setHead(newHead);
-            if (size == capacity) {
-                // delete tail
-                map.remove(tail.key);
-                remove(tail);
-            } else {
-                size++;
-            }
-        }
-    }
-
-    class DoubleLinkedList {
-        int key;
-        int val;
-        DoubleLinkedList prev;
-        DoubleLinkedList next;
-        public DoubleLinkedList(int k, int v) {
-            this.key = k;
-            this.val = v;
-        }
-    }
-}*/
