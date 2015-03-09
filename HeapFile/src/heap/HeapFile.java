@@ -155,6 +155,6 @@ class FreeSpaceComparator implements Comparator<HFPage>
 {
 	@Override
 	public int compare(HFPage first, HFPage second) {
-		return first.getFreeSpace() - second.getFreeSpace();
+		return second.getFreeSpace() - first.getFreeSpace();
 	}
 }

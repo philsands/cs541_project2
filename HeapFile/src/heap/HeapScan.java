@@ -2,14 +2,12 @@ package heap;
 
 import bufmgr.BufMgr;
 import chainexception.ChainException;
-import diskmgr.DiskMgr;
 import global.Minibase;
 import global.PageId;
 import global.RID;
 
 public class HeapScan {
 	
-	private DiskMgr dm = Minibase.DiskManager;
 	private BufMgr bm = Minibase.BufferManager;
 	private RID currid;
 	private PageId curPageId;
