@@ -28,7 +28,6 @@ public class HeapFile {
 	protected PageId headerPageId;
 	private LinkedList<HFPage> HFPages;	
 	private TreeMap<RID, HFPage> HFPageDirectory;
-	private int recordCount;
 
 	public HeapFile(String name) 
 	{
@@ -44,7 +43,6 @@ public class HeapFile {
 		}
 		HFPages = new LinkedList<HFPage>();
 		HFPageDirectory = new TreeMap<RID, HFPage>();
-		recordCount = 0;
 	}
 
 	// must be done in O(log(n))
@@ -155,6 +153,6 @@ class FreeSpaceComparator implements Comparator<HFPage>
 {
 	@Override
 	public int compare(HFPage first, HFPage second) {
-		return second.getFreeSpace() - first.getFreeSpace();
+		return first.getFreeSpace() - second.getFreeSpace();
 	}
 }
