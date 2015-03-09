@@ -112,11 +112,11 @@ public class BufMgr implements GlobalConst{
 	 */
 	public void pinPage(PageId pageno, Page page, boolean emptyPage) throws BufferPoolExceededException, InvalidPageNumberException, HashEntryNotFoundException, PagePinnedException, FileIOException, IOException, DiskMgrException {
 		// search buffer pool for existence of page using hash
-		System.out.println("unpinPage:  "+getNumUnpinned());
+		//System.out.println("unpinPage:  "+getNumUnpinned());
 		//if(emptyPage==true) return;
 		PageId writablePageID=new PageId(INVALID_PAGEID);
 		boolean writable=false;
-		System.out.println("PID:  "+pageno.pid);
+		//System.out.println("PID:  "+pageno.pid);
 		int index=-1;
 		if(pageFrameDirectory.contain(pageno.pid))
 		{
@@ -124,14 +124,17 @@ public class BufMgr implements GlobalConst{
 			//System.out.println("HashTab Has this page");
 			int FrameNum= pageFrameDirectory.get(pageno.pid);
 			// if found, increment pin count for page and return pointer to page
-				System.out.println("Frame in Pinpage:"+ FrameNum+"PID:"+pageno.pid);
+				//System.out.println("Frame in Pinpage:"+ FrameNum+"PID:"+pageno.pid);
 				//System.out.println("HashTab Has this page, page pair is not null");
 				if(bufDescr[FrameNum].getPinCount()==0){
-					System.out.println("QUEUE REMOVE");
+					//System.out.println("QUEUE REMOVE");
 					queue.remove(FrameNum);
 				}
+				
 				bufDescr[FrameNum].incrementPinCount();
+				
 				page.setpage(bufPool[FrameNum].getpage());
+				
 				return;
 			
 		}
@@ -147,12 +150,12 @@ public class BufMgr implements GlobalConst{
             // set of replacement candidates) to hold this page
 			Page pg=new Page();
 			index = getFirstEmptyFrame();
-			System.out.println("INDEX IS:" + index);
+			//System.out.println("INDEX IS:" + index);
             // Also, must write out the old page in chosen frame if it is
             // dirty before reading new page.
 			if (bufDescr[index].pageNumber.pid!=INVALID_PAGEID&&bufDescr[index].getDirtyBit()) {
                 flushPage(bufDescr[index].getPageNumber());
-                System.out.println("DIRTY !!!");
+                //System.out.println("DIRTY !!!");
                 //Minibase.DiskManager.write_page(pageno,bufPool[index]);
                 pageFrameDirectory.remove(bufDescr[index].getPageNumber().pid);
                 
@@ -174,7 +177,7 @@ public class BufMgr implements GlobalConst{
 		else{
 			
 			int frameNumber=getLIRSCandidate();
-			System.out.println("!!!!!!!!!!!!!!!!!!!!!!!"+frameNumber);
+			//System.out.println("!!!!!!!!!!!!!!!!!!!!!!!"+frameNumber);
 			// get a candidate frame and remove it from the policy
 			
 			if(frameNumber != -1) // there are replacement candidates
@@ -196,7 +199,7 @@ public class BufMgr implements GlobalConst{
 			}
 			else // 
 			{
-				System.out.println("Memory FUll...");
+				//System.out.println("Memory FUll...");
 				throw new BufferPoolExceededException(new Exception(),"bufmgr.BufferPoolExceededException");
 			}
 		}
@@ -308,7 +311,7 @@ public class BufMgr implements GlobalConst{
 				bufDescr[FrameNum].decrementPinCount();
 				
 				if (bufDescr[FrameNum].getPinCount() == 0){
-					System.out.println("QUEUE ADD!");
+					//System.out.println("QUEUE ADD!");
                     queue.add(FrameNum);
 				}
 			}
@@ -344,7 +347,7 @@ public class BufMgr implements GlobalConst{
 	{
 		// allocate new pages
 		
-		System.out.println("newPage");
+		//System.out.println("newPage");
 		if(getNumUnpinned()!=0){
 			final PageId pgid=new PageId();
 			//if(isFull()) return null;

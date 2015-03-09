@@ -45,7 +45,7 @@ public class HashTable<k, v> {
                     }
             }
             if (!found) {
-            		System.out.println("INSERT::");
+            		//System.out.println("INSERT::");
                     a[i].push(new AbstractMap.SimpleEntry(key, value));
             }
     }
