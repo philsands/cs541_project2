@@ -3,7 +3,7 @@ package heap;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
-import java.util.TreeMap;
+import java.util.*;
 
 import chainexception.ChainException;
 import bufmgr.BufMgr;
@@ -11,6 +11,7 @@ import diskmgr.DiskMgr;
 import global.Minibase;
 import global.PageId;
 import global.RID;
+import global.Page;
 
 /**
  * 
@@ -27,54 +28,69 @@ public class HeapFile {
 	private String HFName;
 	protected PageId headerPageId;
 	private LinkedList<HFPage> HFPages;	
-	private TreeMap<RID, HFPage> HFPageDirectory;
-
+	private HashMap<RID, HFPage> HFPageDirectory;
+	int count;
 	public HeapFile(String name) 
 	{
+		count=0;
 		HFName = name;
 	    HFPage headerPage = new HFPage();
 	    headerPageId = bm.newPage(headerPage, 1);
 	    headerPage.setCurPage(headerPageId);
-	    bm.unpinPage(headerPageId, true);
+	    //bm.unpinPage(headerPageId, true);
 		if (dm.get_file_entry(HFName) == null)
 		{
 			// allocate a header page to start
 			dm.add_file_entry(HFName, headerPageId);
+			bm.unpinPage(headerPageId, false);
 		}
 		HFPages = new LinkedList<HFPage>();
-		HFPageDirectory = new TreeMap<RID, HFPage>();
+		HFPageDirectory = new HashMap<RID, HFPage>();
 	}
 
 	// must be done in O(log(n))
 	public RID insertRecord(byte[] record) throws ChainException
 	{
+		count++;
 		HFPage insertPage = null;
 		RID rid = null;
+		PageId pgId = new PageId(headerPageId.pid);
+		Page page = new Page();
 		Collections.sort(HFPages,new FreeSpaceComparator());
+		bm.pinPage(pgId,page,false);
+		insertPage = new HFPage(page);
+		System.out.println(count);
 		// if there are no pages, or if the page in the directory with the most free space hasn't enough free space, make a new page; otherwise, add data to page with most free space and re-sort
-		if (HFPages.isEmpty() || HFPages.getFirst().getFreeSpace() <= record.length)
+		if (HFPages.isEmpty())
 		{
-			insertPage = new HFPage();
-			PageId newPid = dm.allocate_page();
-			dm.read_page(newPid, insertPage);
+			
+			System.out.println("HI");
+			//PageId newPid = dm.allocate_page();
+			//dm.read_page(newPid, insertPage);
 			rid = insertPage.insertRecord(record);
 			//dm.write_page(newPid, insertPage);
 			System.out.println(insertPage + "\n" + rid);
-			bm.pinPage(rid.pageno, insertPage, false);
+			
 			HFPages.add(insertPage);
+			
+		}
+		else if (HFPages.getFirst().getFreeSpace() <= record.length){
+			System.out.println("HERE");
+			HFPages.poll();
 		}
 		else
 		{
 			// find the first page in the directory that has enough space for the given record
 			insertPage = HFPages.getFirst();
-			dm.read_page(insertPage.getCurPage(), insertPage);
+			//dm.read_page(insertPage.getCurPage(), insertPage);
 			rid = insertPage.insertRecord(record);
-			dm.write_page(insertPage.getCurPage(), insertPage);
-			bm.pinPage(rid.pageno, insertPage, false);
+			System.out.println(insertPage + "\n" + rid);
+			//dm.write_page(insertPage.getCurPage(), insertPage);
+			
 		}
 
 		HFPageDirectory.put(rid,insertPage);
-		bm.unpinPage(rid.pageno, true);
+		bm.unpinPage(pgId, true);
 		return rid;
 	}
 	
