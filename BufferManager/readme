@@ -1,0 +1,8 @@
+Group member: Phil Sands and Qiaomu Yao
+
+Passed Test 2 and 3, but unable to pass Test 1.
+
+For the newpage with 1 size larger than the bufpool, our code cannot deal with it properly, which will override the original data. We have spent a lot on that, but the bug is still there, I think the logic procedure for this program is correct, and the bug may be caused by the Data Structure (HashTab or Queue) we used. If you can find the bug, please let us know, thank you!
+
+
+
