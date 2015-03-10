@@ -1,0 +1,8 @@
+Phil Sands
+Qiaomu Yao
+
+Our project is not complete, mainly due to Phil's lack of understanding on how the HFPage functioned. Some of the data structure implementation would have been simplified given more familiarity with the material provided to us, and a document that had more clarity regarding the project components. The best feature of the program is the use of the Red-Black TreeMap in order to manage the directory. The keys in the map represent the records and the values are pointers to HFPages. This made the original implementation of the scan very easy and guaranteed O(log(n)) time for insertRecord, updateRecord and deleteRecord.
+
+Phil was responsible for implementing both the HeapFile and HeapScan classes, and Qiaomu helped to debug both programs and prepare them to run through the test cases.
+
+Phil will be withdrawing from this course, while Qiaomu will be continuing on. Phil would like to request that the TAs help Qiaomu to find a new group. Professor Aref has given his permission for Qiaomu to join an existing group of 2.
